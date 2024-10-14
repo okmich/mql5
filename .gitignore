@@ -4,17 +4,18 @@
 # Allow the .gitignore file itself
 !.gitignore
 
-# Experts
+
 !Experts/
+!Indicators/
+!Include/
+!Profiles/
+!Scripts/
+
+
 !Experts/Indicators/**
 !Experts/Okmich/**
 !Experts/Practise/**
 
-# Files
-#!Files/
-
-# Include
-!Include/
 !Include/Okmich/**
 !Include/candlepatterns.mqh
 !Include/JAson.mqh
@@ -25,30 +26,19 @@
 !Include/TradeAlgorithms.mqh
 !Include/WilliamBlau.mqh
 
-
-# Indicators
-!Indicators/
 !Indicators/Articles/**
 !Indicators/Okmich/**
 !Indicators/Practise/**
 
-
-# Profiles
-!Profiles/
 !Profiles/SymbolSets/**
 !Profiles/Templates/**
 
-
-
-# Scripts
-!Scripts/
 !Scripts/General/**
 !Scripts/Okmich/**
 !Scripts/Practise/**
 !Scripts/Python/**
 !Scripts/adr.mq5
 !Scripts/jason_test.mq5
-
 
 
 # Ignore build files and logs (common for MetaTrader)
