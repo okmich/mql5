@@ -1,44 +1,42 @@
 # Ignore everything by default
-*
+# *
 
 # Allow the .gitignore file itself
 !.gitignore
 
-
-!Experts/
-!Indicators/
-!Include/
-!Profiles/
-!Scripts/
+# !Experts/
+# !Indicators/
+# !Include/
+# !Profiles/
 
 
-!Experts/Indicators/**
-!Experts/Okmich/**
-!Experts/Practise/**
+# !Experts/Indicators/**
+# !Experts/Okmich/**
+# !Experts/Practise/**
 
-!Include/Okmich/**
-!Include/candlepatterns.mqh
-!Include/JAson.mqh
-!Include/kalman.mqh
-!Include/MovingAverages.mqh
-!Include/smoothalgorithms.mqh
-!Include/signalcandles.mqh
-!Include/TradeAlgorithms.mqh
-!Include/WilliamBlau.mqh
+# !Include/Okmich/**
+# !Include/candlepatterns.mqh
+# !Include/JAson.mqh
+# !Include/kalman.mqh
+# !Include/MovingAverages.mqh
+# !Include/smoothalgorithms.mqh
+# !Include/signalcandles.mqh
+# !Include/TradeAlgorithms.mqh
+# !Include/WilliamBlau.mqh
 
-!Indicators/Articles/**
-!Indicators/Okmich/**
-!Indicators/Practise/**
+# !Indicators/Articles/**
+# !Indicators/Okmich/**
+# !Indicators/Practise/**
 
-!Profiles/SymbolSets/**
-!Profiles/Templates/**
+# !Profiles/SymbolSets/**
+# !Profiles/Templates/**
 
-!Scripts/General/**
-!Scripts/Okmich/**
-!Scripts/Practise/**
-!Scripts/Python/**
-!Scripts/adr.mq5
-!Scripts/jason_test.mq5
+# !Scripts/General/**
+# !Scripts/Okmich/**
+# !Scripts/Practise/**
+# !Scripts/Python/**
+# !Scripts/adr.mq5
+# !Scripts/jason_test.mq5
 
 
 # Ignore build files and logs (common for MetaTrader)
