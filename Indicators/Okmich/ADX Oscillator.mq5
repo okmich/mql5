@@ -37,7 +37,8 @@
 #property indicator_level1 0.0
 
 //--- input parameters
-input int InpPeriodADX=14; // Period
+input int InpDMIPeriod=14; // DMI Period
+input int InpADXPeriod=14; // ADX Period
 
 //---- buffers
 double    ExtADXBuffer[];
@@ -49,20 +50,27 @@ double    ExtNDBuffer[];
 double    ExtTmpBuffer[];
 double    ExtTmp2Buffer[];
 //--- global variables
-int       ExtADXPeriod;
+int       ExtDMIPeriod, ExtADXPeriod, maxPeriod;
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function                         |
 //+------------------------------------------------------------------+
 void OnInit()
   {
 //--- check for input parameters
-   if(InpPeriodADX>=100 || InpPeriodADX<=0)
+   if(InpDMIPeriod>=100 || InpDMIPeriod<=0)
      {
-      ExtADXPeriod=14;
-      printf("Incorrect value for input variable Period_ADX=%d. Indicator will use value=%d for calculations.",InpPeriodADX,ExtADXPeriod);
+      ExtDMIPeriod=14;
+      printf("Incorrect value for input variable InpDMIPeriod=%d. Indicator will use value=%d for calculations.",InpDMIPeriod,ExtDMIPeriod);
      }
    else
-      ExtADXPeriod=InpPeriodADX;
+      ExtDMIPeriod=InpDMIPeriod;
+   if(InpADXPeriod>=100 || InpADXPeriod<=0)
+     {
+      ExtADXPeriod=14;
+      printf("Incorrect value for input variable Period_ADX=%d. Indicator will use value=%d for calculations.",InpADXPeriod,ExtADXPeriod);
+     }
+   else
+      ExtADXPeriod=InpADXPeriod;
 //---- indicator buffers
    SetIndexBuffer(0,ExtADXBuffer, INDICATOR_DATA);
    SetIndexBuffer(1,ExtDirectionalADXBuffer, INDICATOR_DATA);
@@ -75,12 +83,13 @@ void OnInit()
 //--- indicator digits
    IndicatorSetInteger(INDICATOR_DIGITS,2);
 //--- set draw begin
-   PlotIndexSetInteger(0,PLOT_DRAW_BEGIN,ExtADXPeriod<<1);
-   PlotIndexSetInteger(1,PLOT_DRAW_BEGIN,ExtADXPeriod<<1);
-   PlotIndexSetInteger(2,PLOT_DRAW_BEGIN,ExtADXPeriod);
-   PlotIndexSetInteger(3,PLOT_DRAW_BEGIN,ExtADXPeriod);
+   maxPeriod  = MathMax(ExtADXPeriod, ExtDMIPeriod);
+   PlotIndexSetInteger(0,PLOT_DRAW_BEGIN,maxPeriod<<1);
+   PlotIndexSetInteger(1,PLOT_DRAW_BEGIN,maxPeriod<<1);
+   PlotIndexSetInteger(2,PLOT_DRAW_BEGIN,maxPeriod);
+   PlotIndexSetInteger(3,PLOT_DRAW_BEGIN,maxPeriod);
 //--- indicator short name
-   string short_name=StringFormat("ADX (%d)", ExtADXPeriod);
+   string short_name=StringFormat("ADX (%d, %d)", ExtDMIPeriod, ExtADXPeriod);
    IndicatorSetString(INDICATOR_SHORTNAME,short_name);
 //--- change 1-st index label
    PlotIndexSetString(0,PLOT_LABEL,short_name);
@@ -102,7 +111,7 @@ int OnCalculate(const int rates_total,
                 const int &spread[])
   {
 //--- checking for bars count
-   if(rates_total<ExtADXPeriod)
+   if(rates_total<maxPeriod)
       return(0);
 //--- detect start position
    int start;
@@ -158,15 +167,16 @@ int OnCalculate(const int rates_total,
          ExtNDBuffer[i]=0.0;
         }
       //--- fill smoothed positive and negative buffers
-      ExtPDIBuffer[i]=ExponentialMA(i,ExtADXPeriod,ExtPDIBuffer[i-1],ExtPDBuffer);
-      ExtNDIBuffer[i]=ExponentialMA(i,ExtADXPeriod,ExtNDIBuffer[i-1],ExtNDBuffer);
+      ExtPDIBuffer[i]=ExponentialMA(i,ExtDMIPeriod,ExtPDIBuffer[i-1],ExtPDBuffer);
+      ExtNDIBuffer[i]=ExponentialMA(i,ExtDMIPeriod,ExtNDIBuffer[i-1],ExtNDBuffer);
       //--- fill ADXTmp buffer
       double dTmp=ExtPDIBuffer[i]+ExtNDIBuffer[i];
       double d2Tmp = 0;
       if(dTmp!=0.0)
         {
-         d2Tmp=100.0*(ExtPDIBuffer[i]-ExtNDIBuffer[i])/dTmp;
-         dTmp=100.0*MathAbs((ExtPDIBuffer[i]-ExtNDIBuffer[i])/dTmp);
+         double d = (ExtPDIBuffer[i]-ExtNDIBuffer[i])/dTmp;
+         d2Tmp=100.0*d;
+         dTmp=100.0*MathAbs(d);
         }
       else
         {

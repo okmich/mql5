@@ -13,14 +13,14 @@
 //--- input parameters
 input group "********* Setting **********";
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;             //Timeframe
-input ENUM_LONG_SHORT_FLAG InpLongShortFlag = LONG;   //Long/Short Flag
+input ENUM_LONG_SHORT_FLAG InpLongShortFlag = LONG;         //Long/Short Flag
 
 input group "********* Strategy settings *********";
-input ENUM_MACD_Strategies InpSignalType = MACD_ZeroLineCrossover; //Entry strategy
+input ENUM_VMACD_Strategies InpSignalType = VMACD_ZeroLineCrossover; //Entry strategy
 input int      InpFastMaPeriod=12;             // MACD fast ema
 input int      InpSlowMaPeriod=26;             // MACD slow ema
 input int      InpSignalPeriod=9;              // MACD Signal
-input bool     InpUseVolumeAdjustment = false; //Use Volume aadjustment
+input ENUM_VMACD_CALC_MODE     InpVolumeCalcMode = VMACD_CALC_ADJUSTED; //Volumn-Calculation Mode
 
 input group "********* Position management settings *********";
 input ENUM_POSITION_MANAGEMENT InpPostManagmentType = POSITION_MGT_NONE;  // Type of Position Management Algorithm
@@ -52,7 +52,6 @@ private :
    ENUM_ENTRY_SIGNAL signal;
    //--- indicator settings
    int               mFastMaPeriod, mSlowMaPeriod, mSignalPeriod;
-   bool              mUseVolAdjustment;
    //--- indicators
    CVolumeMacd       *m_VolumeMacd;
    //--- indicator buffer
@@ -60,12 +59,11 @@ private :
 
 public:
                      CStrategyImpl(string symbol, ENUM_TIMEFRAMES period, int InptFastMaPeriod, int InptSlowMaPeriod,
-                 int InptSignalPeriod, bool InptUseVolAdjustmnt): CStrategy(symbol, period)
+                 int InptSignalPeriod): CStrategy(symbol, period)
      {
       mFastMaPeriod = InptFastMaPeriod;
       mSlowMaPeriod = InptSlowMaPeriod;
       mSignalPeriod = InptSignalPeriod;
-      mUseVolAdjustment = InptUseVolAdjustmnt;
 
       mLotSize = InpTradeVolMultiple * SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
      };
@@ -83,7 +81,8 @@ bool CStrategyImpl::Init(ulong magic)
   {
    CStrategy::Init(magic);
 //--- m_VolumeMacd
-   m_VolumeMacd = new CVolumeMacd(mSymbol, mTimeframe, mFastMaPeriod, mSlowMaPeriod, mSignalPeriod, mUseVolAdjustment, VOLUME_TICK);
+   m_VolumeMacd = new CVolumeMacd(mSymbol, mTimeframe, mFastMaPeriod,
+                                  mSlowMaPeriod, mSignalPeriod, InpVolumeCalcMode, VOLUME_TICK);
    return m_VolumeMacd.Init();
   }
 
@@ -102,12 +101,12 @@ void CStrategyImpl::Release(void)
 void CStrategyImpl::CheckAndSetExitSignal(CPositionInfo &positionInfo, Position &position)
   {
    ENUM_POSITION_TYPE posType = positionInfo.PositionType();
-   if(posType == POSITION_TYPE_BUY && mEntrySignal == ENTRY_SIGNAL_SELL)
+   if(posType == POSITION_TYPE_BUY && signal == ENTRY_SIGNAL_SELL)
      {
       position.signal = EXIT_SIGNAL_EXIT;
      }
    else
-      if(posType == POSITION_TYPE_SELL && mEntrySignal == ENTRY_SIGNAL_BUY)
+      if(posType == POSITION_TYPE_SELL && signal == ENTRY_SIGNAL_BUY)
         {
          position.signal = EXIT_SIGNAL_EXIT;
         }
@@ -138,7 +137,7 @@ CSingleExpert singleExpert(ExpertMagic, "Volume Adjusted/Weighted MACD");
 int OnInit()
   {
    CStrategyImpl *strategy = new CStrategyImpl(_Symbol, _Period,
-         InpFastMaPeriod, InpSlowMaPeriod, InpSignalPeriod, InpUseVolumeAdjustment);
+         InpFastMaPeriod, InpSlowMaPeriod, InpSignalPeriod);
 //--- set up Position manager Implementation
    CPositionManager *positionManager = CreatPositionManager(_Symbol, _Period, InpPostManagmentType,
                                        InpATRPeriod, InpStopLossPoints, InpBreakEvenPoints,

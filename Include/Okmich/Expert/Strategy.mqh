@@ -151,7 +151,13 @@ void CStrategy::FindAndExecutionEntry(const double ask, const double bid)
   {
    Entry entry = FindEntry(ask, bid);
    if(entry.signal != ENTRY_SIGNAL_NONE)
+     {
+      entry.sym = mSymbol;
+      entry.magic = _expertMagic;
+      entry.vol = mLotSize;
+      
       ExecuteEntryOrder(mCTradeHandle, entry, mTimeframe);
+     }
 
    ZeroMemory(entry);
   }

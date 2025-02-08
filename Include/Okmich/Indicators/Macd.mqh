@@ -10,7 +10,7 @@
 
 enum ENUM_MACD_Strategies
   {
-   MACD_Divergence,
+   MACD_Directional,
    MACD_OsMA,
    MACD_ZeroLineCrossover
   };
@@ -32,8 +32,10 @@ private :
    double             OsMA();
    ENUM_ENTRY_SIGNAL  OsMAEntrySignal();
    ENUM_ENTRY_SIGNAL  CrossoverSignal();
+   ENUM_ENTRY_SIGNAL  Directional(int shift=1);
 
-   ENUM_ENTRY_SIGNAL  Divergence(int shift=1);
+   ENUM_ENTRY_SIGNAL  OsmaFilter(int shift=1);
+   ENUM_ENTRY_SIGNAL  HistZeroFilter(int shift=1);
 
 public:
                      CMacd(string symbol, ENUM_TIMEFRAMES period,
@@ -56,9 +58,9 @@ public:
    void               GetData(int bufferIndx, double &buffer[], int shift);
 
    ENUM_ENTRY_SIGNAL  TradeSignal(ENUM_MACD_Strategies entryStrategyOption);
+   ENUM_ENTRY_SIGNAL  TradeFilter(ENUM_MACD_Strategies filterOption);
 
-   ENUM_ENTRY_SIGNAL  OsmaFilter(int shift=1);
-   ENUM_ENTRY_SIGNAL  HistZeroFilter(int shift=1);
+   bool               Divergence(int shift=1, bool bullish=true);
   };
 
 //+------------------------------------------------------------------+
@@ -136,12 +138,30 @@ ENUM_ENTRY_SIGNAL CMacd::TradeSignal(ENUM_MACD_Strategies entryStrategyOption)
   {
    switch(entryStrategyOption)
      {
-      case MACD_Divergence:
-         return Divergence(m_ShiftToUse);
+      case MACD_Directional :
+         return Directional(m_ShiftToUse);
       case MACD_OsMA:
          return OsMAEntrySignal();
       case MACD_ZeroLineCrossover :
          return CrossoverSignal();
+      default:
+         return ENTRY_SIGNAL_NONE;
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+ENUM_ENTRY_SIGNAL CMacd::TradeFilter(ENUM_MACD_Strategies filterOption)
+  {
+   switch(filterOption)
+     {
+      case MACD_Directional :
+         return Directional(m_ShiftToUse);
+      case MACD_OsMA:
+         return OsmaFilter(m_ShiftToUse);
+      case MACD_ZeroLineCrossover :
+         return HistZeroFilter();
       default:
          return ENTRY_SIGNAL_NONE;
      }
@@ -210,22 +230,43 @@ ENUM_ENTRY_SIGNAL CMacd::HistZeroFilter(int shift=1)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-ENUM_ENTRY_SIGNAL CMacd::Divergence(int shift=1)
+bool CMacd::Divergence(int shift=1, bool bullish=true)
   {
-   double currentLow = iLow(m_Symbol, m_TF, shift);
-   double highestLow = iLow(m_Symbol, m_TF, iHighest(m_Symbol, m_TF, MODE_LOW, mDivergencePeriod, shift+1));
-   double lowestMacd = ArrayMin(m_HistBuffer, mDivergencePeriod, shift+1);
+   if(bullish)
+     {
+      double currentLow = iLow(m_Symbol, m_TF, shift);
+      double highestLow = iLow(m_Symbol, m_TF, iHighest(m_Symbol, m_TF, MODE_LOW, mDivergencePeriod, shift+1));
+      double lowestMacd = ArrayMin(m_HistBuffer, mDivergencePeriod, shift+1);
 
-   if(m_HistBuffer[shift] < 0 && (currentLow > highestLow) &&
-      (m_HistBuffer[shift] < lowestMacd))
+      if(m_HistBuffer[shift] < 0 && (currentLow > highestLow) &&
+         (m_HistBuffer[shift] < lowestMacd))
+         return true;
+      else
+         return false;
+     }
+   else
+     {
+      double currentHigh = iHigh(m_Symbol, m_TF, shift);
+      double lowestHigh = iHigh(m_Symbol, m_TF, iLowest(m_Symbol, m_TF, MODE_HIGH, mDivergencePeriod, shift+1));
+      double highestMacd = ArrayMin(m_HistBuffer, mDivergencePeriod, shift+1);
+
+      if(m_HistBuffer[shift] > 0 && (currentHigh < lowestHigh) &&
+         (m_HistBuffer[shift] > highestMacd))
+         return true;
+      else
+         return false;
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+ENUM_ENTRY_SIGNAL CMacd::Directional(int shift=1)
+  {
+   if(m_HistBuffer[shift] > m_HistBuffer[shift+1])
       return ENTRY_SIGNAL_BUY;
 
-   double currentHigh = iHigh(m_Symbol, m_TF, shift);
-   double lowestHigh = iHigh(m_Symbol, m_TF, iLowest(m_Symbol, m_TF, MODE_HIGH, mDivergencePeriod, shift+1));
-   double highestMacd = ArrayMin(m_HistBuffer, mDivergencePeriod, shift+1);
-
-   if(m_HistBuffer[shift] > 0 && (currentHigh < lowestHigh) &&
-      (m_HistBuffer[shift] > highestMacd))
+   if(m_HistBuffer[shift] < m_HistBuffer[shift+1])
       return ENTRY_SIGNAL_SELL;
    else
       return ENTRY_SIGNAL_NONE;

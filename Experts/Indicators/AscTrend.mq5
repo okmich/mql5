@@ -91,6 +91,7 @@ void CStrategyImpl::Refresh(void)
       bool refreshed = m_AscTrend.Refresh();
       //--- take values from indicator
       signal = m_AscTrend.TradeSignal();
+      ENUM_ENTRY_SIGNAL filter = m_AscTrend.TradeFilter();
       if(SupportLongEntries(InpLongShortFlag) && signal == ENTRY_SIGNAL_BUY)
         {
          mEntrySignal = ENTRY_SIGNAL_BUY;

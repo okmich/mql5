@@ -15,7 +15,7 @@ class CAscTrend : public CBaseIndicator
   {
 private :
    int                mBarsToCopy;
-   ENUM_ENTRY_SIGNAL  mLastSignal;
+   ENUM_ENTRY_SIGNAL  mSignal, mLastSignal;
    //--- indicator paramter
    int                m_Risk;
    //--- indicator
@@ -38,7 +38,8 @@ public:
    double             GetData(int buffer=0, int shift=0);
    void               GetData(double &buffer[], int buffer=0, int shift=0);
 
-   ENUM_ENTRY_SIGNAL  TradeSignal() {return mLastSignal;};
+   ENUM_ENTRY_SIGNAL  TradeFilter() {return mLastSignal;};
+   ENUM_ENTRY_SIGNAL  TradeSignal() {return mSignal;};
   };
 
 //+------------------------------------------------------------------+
@@ -62,12 +63,15 @@ bool CAscTrend::Refresh(int ShiftToUse=1)
    int bearsCopied = CopyBuffer(m_Handle, 0, 0, mBarsToCopy, m_BearBuffer);
    int bullsCopied = CopyBuffer(m_Handle, 1, 0, mBarsToCopy, m_BullBuffer);
 //resolve signal
-   mLastSignal = ENTRY_SIGNAL_NONE;
+   mSignal = ENTRY_SIGNAL_NONE;
    if(m_BearBuffer[m_ShiftToUse] == 0.0 && m_BullBuffer[m_ShiftToUse] > 0.0)
-      mLastSignal =  ENTRY_SIGNAL_BUY;
+      mSignal =  ENTRY_SIGNAL_BUY;
    else
       if(m_BearBuffer[m_ShiftToUse] > 0.0 && m_BullBuffer[m_ShiftToUse] == 0.0)
-         mLastSignal = ENTRY_SIGNAL_SELL;
+         mSignal = ENTRY_SIGNAL_SELL;
+   
+   if (mSignal != ENTRY_SIGNAL_NONE)
+      mLastSignal = mSignal;
 
    return mBarsToCopy == bearsCopied && bearsCopied == bullsCopied;
   }

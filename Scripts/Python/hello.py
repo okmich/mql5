@@ -5,7 +5,7 @@ print("MetaTrader5 package author: ",mt5.__author__)
 print("MetaTrader5 package version: ",mt5.__version__)
  
 # establish MetaTrader 5 connection to a specified trading account
-if not mt5.initialize(login=2462378, server="Deriv-Demo",password="82SweetZ82"):
+if not mt5.initialize():
     print("initialize() failed, error code =",mt5.last_error())
     quit()
  

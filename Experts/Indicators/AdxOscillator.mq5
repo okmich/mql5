@@ -12,6 +12,7 @@
 
 input ENUM_ADXOSC_Strategies InpHowTo = ADXOSC_AboveBelowZeroLine; //Strategy for entry
 input int InpADXPeriod = 14;
+input int InpDMIPeriod = 14;
 input int InpOscSlopePeriod = 3;
 input ulong    ExpertMagic           = 980023;              //Expert MagicNumbers
 

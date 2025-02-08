@@ -9,7 +9,7 @@
 
 #include <Math\Stat\Math.mqh>
 #include <Okmich\Common\Common.mqh>
-#include <Okmich\Common\NormalSeries.mqh>
+#include <Okmich\Common\LogNormalSeries.mqh>
 //+------------------------------------------------------------------+
 //| AtrReader                                                        |
 //+------------------------------------------------------------------+
@@ -28,7 +28,7 @@ private:
    bool              processAtr();
 
 public:
-                     CAtrReader(string symbol,ENUM_TIMEFRAMES timeFrame,
+                     CAtrReader(string symbol, ENUM_TIMEFRAMES timeFrame,
               int atrPeriod = 14, int InpHistoryPeriod = 90, double InpProbThreshold = 0.4)
      {
       mSymbol = symbol;
@@ -126,9 +126,9 @@ ENUM_HIGHLOW CAtrReader::classifyATR(int shift=0)
    processAtr();
    double atrValue = mATRBuffer[ArraySize(mATRBuffer) - shift - 1];
 
-   CNormalSeries<double> cNormalSeries(mHistoryBars);
-   cNormalSeries.Refresh(mATRBuffer);
-   currentAtrThreshold = cNormalSeries.QuantileDistribution(mProbThreshold);
+   CLogNormalSeries<double> cLogNormalSeries(mHistoryBars);
+   cLogNormalSeries.Refresh(mATRBuffer);
+   currentAtrThreshold = cLogNormalSeries.QuantileDistribution(mProbThreshold);
 
    if(atrValue > currentAtrThreshold)
       return HIGHLOW_HIGH;

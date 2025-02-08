@@ -1,34 +1,34 @@
 //+------------------------------------------------------------------+
-//|                                              DslCciofAverage.mq5 |
-//|                                    Copyright 2021, Michael Enudi |
+//|                                                MACD+StochRSI.mq5 |
+//|                                    Copyright 2024, Michael Enudi |
 //|                                             okmich2002@yahoo.com |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2021, Michael Enudi"
+#property copyright "Copyright 2024, Michael Enudi"
 #property link      "okmich2002@yahoo.com"
 #property version   "1.00"
 
 #include <Okmich\Expert\SingleExpert.mqh>
-#include <Okmich\Indicators\DslCCIofAverage.mqh>
+#include <Okmich\Indicators\Macd.mqh>
 
-input group "********* Setting **********";
-input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;          //Timeframe
-input ENUM_LONG_SHORT_FLAG InpLongShortFlag = LONG;      //Long/Short Flag
+//--- input EXPERT_MAGIC
+const ulong EXPERT_MAGIC = 1000000000;
 
-input group "********* Indicator settings *********";
-input ENUM_CCIMA_Strategies  InpHowSignal = CCIMA_AboveBelowMidLevelFilter;                    //Signal Type
-input int    InpCciPeriod = 14;                          //CCI period
-input int    InpMaPeriod  = 32;                          //Moving average period
-input int    InpDslSignalPeriod  = 9;                    //DSL Signal period
-input int    InpDslObLevel  = 80;                        //DSL Overbought level
-input bool   InpUseFloatingLevels  = true;               //Use floating levels
-input ENUM_MA_METHOD    InpSmoothingMethod  = MODE_EMA;  //Smoothing Method
+//+------------------------------------------------------------------+
+//| Input parameters                                                 |
+//+------------------------------------------------------------------+
+input group "********* Strategy settings *********";
+input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M12;             //Timeframe
+input ENUM_TIMEFRAMES InpHigherTimeframe = PERIOD_H1;        //Higher Timeframe
+input ENUM_LONG_SHORT_FLAG InpLongShortFlag = LONG_SHORT;    //Long/Short Flag
 
-input group "********* Trade Size settings *********";
-input int   InpTradeVolMultiple = 1;               // Minimum Lot size multiple
+input group "********* Long Strategy settings *********";
+input ENUM_MACD_Strategies InpSignalType = MACD_ZeroLineCrossover; //Entry strategy
+input int      InpFastMaPeriod=12;
+input int      InpSlowMaPeriod=26;
+input int      InpSignalPeriod=9;
 
-input group "********* Other Settings *********";
-input ulong    ExpertMagic           = 980023;              //Expert MagicNumbers
-
+input group "********* Volume setting **********";
+input int InpLotSizeMultiple = 1;                     //Multiple of minimum lot size
 
 input group "********* Position management settings *********";
 input ENUM_POSITION_MANAGEMENT InpPostManagmentType = POSITION_MGT_FIXED_ATR_MULTIPLES;  // Type of Position Management Algorithm
@@ -42,110 +42,157 @@ input double InpStopLossMultiple = 2;                 // ATR multiple for stop l
 input double InpBreakEvenMultiple = 1;                // ATR multiple for break-even
 input double InpTrailingOrTpMultiple = 2;             // ATR multiple for Maximum floating/Take profit
 
-
-
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-class CFilter : public CStrategy
+class CStrategyImpl : public CStrategy
   {
 private :
    //--- indicator values
-   ENUM_ENTRY_SIGNAL signal;
+   ENUM_ENTRY_SIGNAL macdSignal, higherMacdFilter;
    //--- indicator settings
-   int                m_CciPeriod, m_MaPeriod, m_DslSignalPeriod;
-   ENUM_MA_METHOD     m_SmoothingMethod;
-   bool               m_FloatingLevels;
-   //--- indicators
-   CDslCCIofAverage   *mMaCci;
-   //--- indicator buffer
-   //-- others
 
+   //--- indicators
+   CMacd             *m_Macds[2];
+
+   //--- indicator buffer
+
+protected:
+   virtual Entry     FindEntry(const double ask, const double bid);
 
 public:
-                     CFilter(string symbol, ENUM_TIMEFRAMES period, int InptCciPeriod=32,
-           int InptMaPeriod=14, ENUM_MA_METHOD InptSmoothMethod = MODE_EMA,
-           int InptDslSignal = 9, bool useFloatinglevels=true): CStrategy(symbol, period)
+                     CStrategyImpl(string symbol, ENUM_TIMEFRAMES period, int InptVolMultiple): CStrategy(symbol, period)
      {
-      m_CciPeriod = InptCciPeriod;
-      m_MaPeriod = InptMaPeriod;
-      m_SmoothingMethod = InptSmoothMethod;
-      m_DslSignalPeriod = InptDslSignal;
-      m_FloatingLevels = useFloatinglevels;
-
-      mLotSize = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+      mLotSize = InptVolMultiple*SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
      };
 
    virtual bool      Init(ulong magic);
-
-   virtual void      Refresh();
    virtual void      CheckAndSetExitSignal(CPositionInfo &positionInfo, Position &position);
+   virtual void      Refresh();
    virtual void      Release();
   };
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-bool CFilter::Init(ulong magic)
+bool CStrategyImpl::Init(ulong magic)
   {
-   CStrategy::Init(magic);
-//--- mMaCci
-   mMaCci = new CDslCCIofAverage(mSymbol, mTimeframe, m_CciPeriod, m_MaPeriod, m_SmoothingMethod,
-                                 m_DslSignalPeriod, m_FloatingLevels, InpDslObLevel);
-   return mMaCci.Init();
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void CFilter::Release(void)
-  {
-   mMaCci.Release();
-   delete mMaCci;
-  }
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-void CFilter::CheckAndSetExitSignal(CPositionInfo &positionInfo, Position &position)
-  {
-   ENUM_POSITION_TYPE posType = positionInfo.PositionType();
-   if(posType == POSITION_TYPE_BUY && mEntrySignal != ENTRY_SIGNAL_BUY)
+   if(mTimeframe >= InpHigherTimeframe)
      {
-      position.signal = EXIT_SIGNAL_EXIT;
+      SetReturnError(1000);
+      return false;
      }
-   else
-      if(posType == POSITION_TYPE_SELL && mEntrySignal != ENTRY_SIGNAL_SELL)
-        {
-         position.signal = EXIT_SIGNAL_EXIT;
-        }
+
+   CStrategy::Init(magic);
+//--- m_Macds
+   m_Macds[0] = new CMacd(mSymbol, mTimeframe, InpFastMaPeriod, InpSlowMaPeriod, InpSignalPeriod);
+   m_Macds[1] = new CMacd(mSymbol, InpHigherTimeframe, InpFastMaPeriod, InpSlowMaPeriod, InpSignalPeriod);
+
+   return m_Macds[0].Init() && m_Macds[1].Init();
   }
 
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-void CFilter::Refresh(void)
+void CStrategyImpl::Release(void)
   {
+   for(int i = 0; i < 2; i++)
+     {
+      m_Macds[i].Release();
+      delete m_Macds[i];
+     }
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void CStrategyImpl::Refresh(void)
+  {
+   int barsToCopy = 4;
+//--- Check for new bar
    if(IsNewBar())
      {
-      //-- mMaCci
-      bool bool1 = mMaCci.Refresh(mRefShift);
-      signal = mMaCci.TradeSignal(InpHowSignal);
-      mEntrySignal = SupportShortEntries(InpLongShortFlag) && signal == ENTRY_SIGNAL_SELL ? signal :
-                     SupportLongEntries(InpLongShortFlag) && signal == ENTRY_SIGNAL_BUY ? signal : ENTRY_SIGNAL_NONE;
+      m_Macds[0].Refresh(mRefShift);
+      m_Macds[1].Refresh(0);
+
+      macdSignal = m_Macds[0].TradeSignal(InpSignalType);
+      higherMacdFilter = m_Macds[1].TradeFilter(InpSignalType);
+      mEntrySignal = higherMacdFilter == macdSignal && macdSignal == ENTRY_SIGNAL_SELL ? macdSignal :
+                     higherMacdFilter == macdSignal && macdSignal == ENTRY_SIGNAL_BUY ? macdSignal :
+                     ENTRY_SIGNAL_NONE;
      }
   }
 
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+Entry CStrategyImpl::FindEntry(const double ask, const double bid)
+  {
+   Entry entry = noEntry();
+
+   if(!mIsNewBar)
+      return entry;
+
+//--- implement entry logic
+   if(SupportLongEntries(InpLongShortFlag))
+     {
+      if(mEntrySignal == ENTRY_SIGNAL_BUY)
+        {
+         entry.signal = ENTRY_SIGNAL_BUY;
+         entry.price = ask;
+        }
+     }
+   else
+      if(SupportShortEntries(InpLongShortFlag))
+        {
+         if(mEntrySignal == ENTRY_SIGNAL_SELL)
+           {
+            entry.signal = ENTRY_SIGNAL_SELL;
+            entry.price = bid;
+           }
+        }
+
+   if(entry.signal != ENTRY_SIGNAL_NONE)
+     {
+      entry.sym = mSymbol;
+      entry.magic = _expertMagic;
+      entry.vol = mLotSize;
+     }
+
+   return entry;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void CStrategyImpl::CheckAndSetExitSignal(CPositionInfo &positionInfo,Position &position)
+  {
+   if(!mIsNewBar)
+      return;
+
+   ENUM_POSITION_TYPE postType = positionInfo.PositionType();
+//if(postType == POSITION_TYPE_BUY && macdSignal == ENTRY_SIGNAL_SELL)
+//  {
+//   position.signal = EXIT_SIGNAL_EXIT;
+//  }
+//else
+//   if(postType == POSITION_TYPE_SELL && macdSignal == ENTRY_SIGNAL_BUY)
+//     {
+//      position.signal = EXIT_SIGNAL_EXIT;
+//     }
+  }
+//+------------------------------------------------------------------+
+
+
 // the expert to run our strategy
-CSingleExpert singleExpert(ExpertMagic, "DSL_CCI_of_MA");
+CSingleExpert singleExpert(EXPERT_MAGIC, "MACD__001");
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   CFilter *strategy = new CFilter(_Symbol, _Period, InpCciPeriod, InpMaPeriod, InpSmoothingMethod,
-                                   InpDslSignalPeriod, InpUseFloatingLevels);
-//set position management
+   CStrategy *strategy = new CStrategyImpl(_Symbol, _Period, InpLotSizeMultiple);
    CPositionManager *mPositionManager = CreatPositionManager(_Symbol, InpTimeframe,
                                         InpPostManagmentType,
                                         InpATRPeriod, InpStopLossPoints, InpBreakEvenPoints, InpTrailingOrTpPoints,
@@ -153,9 +200,7 @@ int OnInit()
                                         InpStopLossMultiple, InpBreakEvenMultiple, InpTrailingOrTpMultiple);
    strategy.SetPositionManager(mPositionManager);
 
-//set strategy on expert
    singleExpert.SetStrategyImpl(strategy);
-
    if(singleExpert.OnInitHandler())
       return INIT_SUCCEEDED ;
    else
@@ -175,7 +220,6 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
   {
-//---
    singleExpert.OnTickHandler();
   }
 //+------------------------------------------------------------------+

@@ -10,6 +10,7 @@
 #include <Okmich\Expert\SingleExpert.mqh>
 #include <Okmich\Indicators\FibonacciRange.mqh>
 
+input ENUM_TIMEFRAMES InpTimeframe = PERIOD_CURRENT;         //Timeframe
 input ulong  ExpertMagic           = 980023;                //Expert MagicNumbers
 
 //+------------------------------------------------------------------+
@@ -90,7 +91,7 @@ void CStrategyImpl::Refresh(void)
   }
 
 // the expert to run our strategy
-CSingleExpert singleExpert(ExpertMagic, 10);
+CSingleExpert singleExpert(ExpertMagic, "");
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -98,9 +99,9 @@ CSingleExpert singleExpert(ExpertMagic, 10);
 int OnInit()
   {
 //--- set up Trading Strategy Implementaion
-   CStrategyImpl *strategy = new CStrategyImpl(_Symbol, _Period);
+   CStrategyImpl *strategy = new CStrategyImpl(_Symbol, InpTimeframe);
 //set position management
-   strategy.SetPositionManager(new CNoPositionManager(_Symbol, _Period));
+   strategy.SetPositionManager(new CNoPositionManager(_Symbol, InpTimeframe));
 
 //set strategy on expert
    singleExpert.SetStrategyImpl(strategy);

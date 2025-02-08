@@ -7,6 +7,7 @@
 #property link      "okmich2002@yahoo.com"
 
 #include "BaseIndicator.mqh"
+#include <MovingAverages.mqh>
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -26,7 +27,7 @@ public:
                      CAtr(string symbol, ENUM_TIMEFRAMES period, int InputPeriod=14, int historyBars=10, bool usePercentRank=false, int InputRankPeriod=100): CBaseIndicator(symbol, period)
      {
       m_Period = InputPeriod;
-      mBarsToCopy = historyBars;
+      mBarsToCopy = historyBars*2;
       m_PercentRankPeriod = usePercentRank ? InputRankPeriod : -1;
      }
 
@@ -36,6 +37,7 @@ public:
 
    double                         GetData(int shift=0);
    void                           GetData(double &buffer[], int shift=0);
+   double                         CalculateMAofATR(int period, int i);
   };
 
 //+------------------------------------------------------------------+
@@ -93,5 +95,15 @@ void CAtr::GetData(double &buffer[], int shift=0)
    ArrayResize(buffer, mBarsToCopy - shift);
 
    ArrayCopy(buffer, m_Buffer, 0, shift);
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+double CAtr::CalculateMAofATR(int period, int i)
+  {
+   if(i+period >= mBarsToCopy)
+      return EMPTY_VALUE;
+   return SimpleMA(i, period, m_Buffer);
   }
 //+------------------------------------------------------------------+

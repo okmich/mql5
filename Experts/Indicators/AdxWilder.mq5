@@ -91,7 +91,7 @@ bool CStrategyImpl::Init(ulong magic)
 //--- price buffers
    ArraySetAsSeries(m_CloseBuffer, true);
 //--- mAdxWilder
-   mAdxWilder = new CADXWilder(mSymbol, mTimeframe, mDmiPeriod, mAdxPeriod, mSignfSlope, mTrendIndx);
+   mAdxWilder = new CADXWilder(mSymbol, mTimeframe, mDmiPeriod, mAdxPeriod, mTrendIndx, mSignfSlope);
 
    return mAdxWilder.Init();
   }
@@ -116,22 +116,16 @@ Entry CStrategyImpl::FindEntry(const double ask, const double bid)
       return entry;
 
 //signal logic
-   if(SupportLongEntries(InpLongShortFlag))
+   if(SupportLongEntries(InpLongShortFlag) && adxSignal == ENTRY_SIGNAL_BUY)
      {
-      if(mEntrySignal == ENTRY_SIGNAL_BUY)
-        {
-         entry.signal = ENTRY_SIGNAL_BUY;
-         entry.price = ask;
-        }
+      entry.signal = ENTRY_SIGNAL_BUY;
+      entry.price = ask;
      }
    else
-      if(SupportShortEntries(InpLongShortFlag))
+      if(SupportShortEntries(InpLongShortFlag) && adxSignal == ENTRY_SIGNAL_SELL)
         {
-         if(mEntrySignal == ENTRY_SIGNAL_SELL)
-           {
-            entry.signal = ENTRY_SIGNAL_SELL;
-            entry.price = bid;
-           }
+         entry.signal = ENTRY_SIGNAL_SELL;
+         entry.price = bid;
         }
 
    if(entry.signal != ENTRY_SIGNAL_NONE)
@@ -174,9 +168,6 @@ void CStrategyImpl::Refresh(void)
 
       mAdxWilder.Refresh();
       adxSignal = mAdxWilder.DominantCrossOverWithRisingDX();
-      mEntrySignal = SupportShortEntries(InpLongShortFlag) && adxSignal == ENTRY_SIGNAL_SELL ? adxSignal :
-                     SupportLongEntries(InpLongShortFlag) && adxSignal == ENTRY_SIGNAL_BUY ? adxSignal :
-                     ENTRY_SIGNAL_NONE;
      }
   }
 

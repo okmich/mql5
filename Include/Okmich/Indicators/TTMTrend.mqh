@@ -35,7 +35,7 @@ public:
    virtual bool       Refresh(int ShiftToUse=1);
    virtual void       Release();
 
-   ENUM_ENTRY_SIGNAL  TradeSignal();
+   ENUM_ENTRY_SIGNAL  TradeSignal(int shift=-1);
 
    double             Open(int shift=0);
    double             Close(int shift=0);
@@ -99,13 +99,14 @@ double    CTTMTrend::Close(int shift=0)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-ENUM_ENTRY_SIGNAL CTTMTrend::TradeSignal()
+ENUM_ENTRY_SIGNAL CTTMTrend::TradeSignal(int shift=-1)
   {
+  int mShift = (shift == -1) ? m_ShiftToUse : shift;
   //kind of scare to use indicator colors
-   if(m_TTmFlagBuffer[m_ShiftToUse] == 2.0)
+   if(m_TTmFlagBuffer[mShift] == 2.0)
       return ENTRY_SIGNAL_SELL;
    else
-      if(m_TTmFlagBuffer[m_ShiftToUse] == 1.0)
+      if(m_TTmFlagBuffer[mShift] == 1.0)
          return ENTRY_SIGNAL_BUY;
       else
          return ENTRY_SIGNAL_NONE;

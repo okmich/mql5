@@ -8,10 +8,16 @@
 
 #include "BaseIndicator.mqh"
 
-enum ENUM_MACD_Strategies
+enum ENUM_VMACD_Strategies
   {
-   MACD_OsMA,
-   MACD_ZeroLineCrossover
+   VMACD_OsMA,
+   VMACD_ZeroLineCrossover
+  };
+
+enum ENUM_VMACD_CALC_MODE
+  {
+   VMACD_CALC_ADJUSTED,
+   VMACD_CALC_WEIGHTED
   };
 
 //+------------------------------------------------------------------+
@@ -24,7 +30,7 @@ private :
    //--- indicator paramter
    int                mFastMaPeriod, mSlowMaPeriod, mSignalPeriod;
    ENUM_APPLIED_VOLUME mAppliedVolume;
-   bool              mUseVolAjdustment;
+   ENUM_VMACD_CALC_MODE              mVMacdCalcMode;
    //--- indicator
    int                m_Handle;
    //--- indicator buffer
@@ -37,7 +43,8 @@ private :
 public:
                      CVolumeMacd(string symbol, ENUM_TIMEFRAMES period,
                int InputFastMaPeriod, int InputSlowMaPeriod, int InputSignalPeriod,
-               bool InputUseVolumeAjustment=false, ENUM_APPLIED_VOLUME InputAppliedVolume = VOLUME_TICK,
+               ENUM_VMACD_CALC_MODE InputCalcMode=VMACD_CALC_ADJUSTED,
+               ENUM_APPLIED_VOLUME InputAppliedVolume = VOLUME_TICK,
                int historyBars=6): CBaseIndicator(symbol, period)
      {
       mFastMaPeriod = InputFastMaPeriod;
@@ -46,7 +53,7 @@ public:
 
       mAppliedVolume = InputAppliedVolume;
 
-      mUseVolAjdustment = InputUseVolumeAjustment;
+      mVMacdCalcMode = InputCalcMode;
       mBarsToCopy = historyBars;
      }
 
@@ -57,7 +64,7 @@ public:
    double             GetData(int bufferIndx, int shift=1);
    void               GetData(int bufferIndx, double &buffer[], int shift);
 
-   ENUM_ENTRY_SIGNAL  TradeSignal(ENUM_MACD_Strategies entryStrategyOption);
+   ENUM_ENTRY_SIGNAL  TradeSignal(ENUM_VMACD_Strategies entryStrategyOption);
 
    ENUM_ENTRY_SIGNAL  OsmaFilter(int shift=1);
    ENUM_ENTRY_SIGNAL  HistZeroFilter(int shift=1);
@@ -70,12 +77,15 @@ bool CVolumeMacd::Init(void)
   {
    ArraySetAsSeries(m_HistBuffer, true);
    ArraySetAsSeries(m_SignalBuffer, true);
-   if(mUseVolAjdustment)
+   if(mVMacdCalcMode == VMACD_CALC_ADJUSTED)
       m_Handle = iCustom(m_Symbol, m_TF, "Articles\\Volume-Adjusted MACD",
                          mFastMaPeriod, mSlowMaPeriod, mSignalPeriod, mAppliedVolume);
    else
-      m_Handle = iCustom(m_Symbol, m_TF, "Articles\\Volume-Weighted MACD",
-                         mFastMaPeriod, mSlowMaPeriod, mSignalPeriod, mAppliedVolume);
+      if(mVMacdCalcMode == VMACD_CALC_WEIGHTED)
+         m_Handle = iCustom(m_Symbol, m_TF, "Articles\\Volume-Weighted MACD",
+                            mFastMaPeriod, mSlowMaPeriod, mSignalPeriod, mAppliedVolume);
+      else
+         m_Handle = INVALID_HANDLE;
 
    return m_Handle != INVALID_HANDLE;
   }
@@ -138,13 +148,13 @@ void CVolumeMacd::GetData(int bufferIndx, double &buffer[], int shift)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-ENUM_ENTRY_SIGNAL CVolumeMacd::TradeSignal(ENUM_MACD_Strategies entryStrategyOption)
+ENUM_ENTRY_SIGNAL CVolumeMacd::TradeSignal(ENUM_VMACD_Strategies entryStrategyOption)
   {
    switch(entryStrategyOption)
      {
-      case MACD_OsMA:
+      case VMACD_OsMA:
          return OsMAEntrySignal();
-      case MACD_ZeroLineCrossover :
+      case VMACD_ZeroLineCrossover :
          return CrossoverSignal();
       default:
          return ENTRY_SIGNAL_NONE;

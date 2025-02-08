@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                          ADX+Keltner Channel.mq5 |
+//|             MACD Crossovers with Filters+SuperTrend For Exit.mq5 |
 //|                                    Copyright 2024, Michael Enudi |
 //|                                             okmich2002@yahoo.com |
 //+------------------------------------------------------------------+
@@ -9,48 +9,53 @@
 
 #include <Okmich\Expert\SingleExpert.mqh>
 #include <Okmich\Indicators\KeltnerChannel.mqh>
-#include <Okmich\Indicators\ADXWilder.mqh>
+#include <Okmich\Indicators\macd.mqh>
+#include <Okmich\Indicators\supertrend.mqh>
 
 //+------------------------------------------------------------------+
 //| Input parameters                                                 |
 //+------------------------------------------------------------------+
 input group "********* Strategy settings *********";
-input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M4;             //Timeframe
+input ENUM_TIMEFRAMES InpTimeframe = PERIOD_CURRENT;             //Timeframe
 input ENUM_LONG_SHORT_FLAG InpLongShortFlag = LONG_SHORT;   //Long/Short Flag
 
 input group "********* Long Strategy settings *********";
-input int      InpLongKcPeriod=20;
-input double   InpLongKcAtrMultiplier=2.0;
+input ENUM_KTC_FILTER InpLongHowToFilter = KTC_FILTER_ABOVE_BELOW_BAND; //Filter strategy
+input int      InpLongKcPeriod=48;
+input double   InpLongKcAtrMultiplier=0.5;
 input ENUM_MA_TYPE      InpLongKcMaMethod=MA_TYPE_EMA;
-input int InpLongDMIPeriod = 13;
-input int InpLongADXPeriod = 8;
-input int InpLongADXLevel = 25;
+input ENUM_MACD_Strategies InpLongHowToTrigger = MACD_ZeroLineCrossover; //Long Entry MACD Signal Type
+input int      InpLongFastMaPeriod=12;
+input int      InpLongSlowMaPeriod=26;
+input int      InpLongSignalPeriod=9;
 
 input group "********* Short Strategy settings *********";
-input int      InpShortKcPeriod=20;
-input double   InpShortKcAtrMultiplier=2.0;
+input ENUM_KTC_FILTER InpShortHowToFilter = KTC_FILTER_ABOVE_BELOW_BAND; //Short Filter strategy
+input int      InpShortKcPeriod=48;
+input double   InpShortKcAtrMultiplier=0.5;
 input ENUM_MA_TYPE      InpShortKcMaMethod=MA_TYPE_EMA;
-input int InpShortDMIPeriod = 13;
-input int InpShortADXPeriod = 8;
-input int InpShortADXLevel = 25;
+input ENUM_MACD_Strategies InpShortHowToTrigger = MACD_ZeroLineCrossover; //Short Entry MACD Signal Type
+input int      InpShortFastMaPeriod=12;
+input int      InpShortSlowMaPeriod=26;
+input int      InpShortSignalPeriod=9;
 
 input group "********* Volume setting **********";
 input int InpLotSizeMultiple = 1;                     //Multiple of minimum lot size
 
-input group "********* Position management settings *********";
-input ENUM_POSITION_MANAGEMENT InpPostManagmentType = POSITION_MGT_FLEX_ATR_MULTIPLES;  // Type of Position Management Algorithm
+input group "********* Exit setting **********";
 input int InpATRPeriod = 60;                          // ATR Period (Required)
-input double InpStopLossPoints = -1;                  // Stop loss distance in points
-input double InpBreakEvenPoints = -1;                 // Points to Break-even
-input double InpTrailingOrTpPoints = -1;              // Trailing/Take profit points
-input double InpMaxLossAmount = 100.00;               // Maximum allowable loss in dollars
-input bool InpScratchBreakEvenFlag = true;            // Enable break-even with scratch profit
-input double InpStopLossMultiple = 2.5;               // ATR multiple for stop loss
-input double InpBreakEvenMultiple = 10;                // ATR multiple for break-even
-input double InpTrailingOrTpMultiple = 10;             // ATR multiple for Maximum floating/Take profit
+input int InpSuperTrendAtrMultiple = 2;               //SuperTrend Exit Multiple
 
-input group "********* Other settings *********";
-input ulong    ExpertMagic           = 980023;              //Expert MagicNumbers
+input group "********* Filter settings **********";
+input bool InpUseAtrFilter = false;                     //Use Atr filter
+input double InpAtrPercentileFilter = 0.5;              //Atr Filter Percentile
+input bool InpUseVolumeFilter = false;                  //Use Volume filter
+input double InpVolumePercentileFilter = 0.5;           //Volume Filter Percentile
+
+input group "********* Others *********";
+input double InpMaxLossAmount = 40.00;               // Maximum allowable loss in dollars
+input double InpStopLossMultiple = 2;                 // ATR multiple for stop loss
+input ulong    ExpertMagic           = 980023;         //Expert MagicNumbers
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -62,8 +67,12 @@ private :
    //--- indicator settings
    //--- indicators
    CKeltnerChannel   *m_KetChanls[2];
-   CADXWilder         *m_AdxWilders[2];
+   CMacd             *m_Macds[2];
+   CAtrReader        *mCAtrReader;
+   CSuperTrend       *mCSuperTrend;
    //-- others
+   bool              AtrFilter();
+   bool              VolumeFilter();
 
 protected:
    virtual Entry     FindEntry(const double ask, const double bid);
@@ -94,12 +103,15 @@ bool CStrategyImpl::Init(ulong magic)
    m_KetChanls[1] = new CKeltnerChannel(mSymbol, mTimeframe, InpShortKcPeriod, InpShortKcMaMethod,
                                         InpShortKcAtrMultiplier, PRICE_CLOSE);
    bool kcInited = m_KetChanls[0].Init() && m_KetChanls[1].Init();
-//--- m_AdxWilders
-   m_AdxWilders[0] = new CADXWilder(mSymbol, mTimeframe, InpLongDMIPeriod, InpLongADXPeriod, InpLongADXLevel, 15);
-   m_AdxWilders[1] = new CADXWilder(mSymbol, mTimeframe, InpShortDMIPeriod, InpShortADXPeriod, InpShortADXLevel, 15);
-   bool maInited = m_AdxWilders[0].Init() && m_AdxWilders[1].Init();
+//--- m_Macds
+   m_Macds[0] = new CMacd(mSymbol, mTimeframe, InpLongFastMaPeriod, InpLongSlowMaPeriod, InpLongSignalPeriod);
+   m_Macds[1] = new CMacd(mSymbol, mTimeframe, InpShortFastMaPeriod, InpShortSlowMaPeriod, InpShortSignalPeriod);
+   bool maInited = m_Macds[0].Init() && m_Macds[1].Init();
 
-   return kcInited && maInited;
+   mCAtrReader = new CAtrReader(mSymbol, mTimeframe, InpATRPeriod);
+   mCSuperTrend = new CSuperTrend(mSymbol, mTimeframe, InpATRPeriod, InpSuperTrendAtrMultiple, 4);
+
+   return kcInited && maInited && mCSuperTrend.Init();
   }
 
 //+------------------------------------------------------------------+
@@ -110,11 +122,15 @@ void CStrategyImpl::Release(void)
    for(int i = 0; i < 2; i++)
      {
       m_KetChanls[i].Release();
-      m_AdxWilders[i].Release();
+      m_Macds[i].Release();
 
       delete m_KetChanls[i];
-      delete m_AdxWilders[i];
+      delete m_Macds[i];
      }
+   mCSuperTrend.Release();
+   delete mCSuperTrend;
+
+   delete mCAtrReader;
   }
 
 //+------------------------------------------------------------------+
@@ -125,29 +141,34 @@ Entry CStrategyImpl::FindEntry(const double ask, const double bid)
    Entry entry = noEntry();
    if(!mIsNewBar)
       return entry;
-   
-//--- implement entry logic
-   if(SupportLongEntries(InpLongShortFlag))
-     {
-      ENUM_ENTRY_SIGNAL ktcFilter = m_KetChanls[0].TradeFilter(KTC_FILTER_ABOVE_BELOW_BAND);
-      ENUM_ENTRY_SIGNAL dmiSignal = m_AdxWilders[0].DominantCrossOverWithRisingDX();
 
-      if(ktcFilter == dmiSignal && dmiSignal == ENTRY_SIGNAL_BUY)
+//--- Try extra trade filters
+   bool volumeFilter = InpUseVolumeFilter ? VolumeFilter() : true;
+   bool atrFilter = InpUseAtrFilter ? AtrFilter() : true;
+
+//--- implement entry logic
+   if(SupportLongEntries(InpLongShortFlag) && volumeFilter && atrFilter)
+     {
+      ENUM_ENTRY_SIGNAL ktcSignal = m_KetChanls[0].TradeFilter(InpLongHowToFilter);
+      ENUM_ENTRY_SIGNAL macdSignal = m_Macds[0].TradeSignal(InpLongHowToTrigger);
+      if(macdSignal == ktcSignal && ktcSignal == ENTRY_SIGNAL_BUY)
         {
-         entry.signal = dmiSignal;
+         entry.signal = ktcSignal;
          entry.price = ask;
+         entry.sl = bid - (InpStopLossMultiple * mCAtrReader.atr(mRefShift));
         }
      }
 
-   if(SupportShortEntries(InpLongShortFlag))
+   if(SupportShortEntries(InpLongShortFlag) && volumeFilter && atrFilter)
      {
-      ENUM_ENTRY_SIGNAL ktcFilter = m_KetChanls[1].TradeFilter(KTC_FILTER_ABOVE_BELOW_BAND);
-      ENUM_ENTRY_SIGNAL dmiSignal = m_AdxWilders[1].DominantCrossOverWithRisingDX();
-      
-      if(ktcFilter == dmiSignal && dmiSignal == ENTRY_SIGNAL_SELL)
+      ENUM_ENTRY_SIGNAL ktcSignal = m_KetChanls[1].TradeFilter(InpShortHowToFilter);
+      ENUM_ENTRY_SIGNAL macdSignal = m_Macds[1].TradeSignal(InpShortHowToTrigger);
+
+      if(macdSignal == ktcSignal && ktcSignal == ENTRY_SIGNAL_SELL)
         {
-         entry.signal = dmiSignal;
+         entry.signal = ktcSignal;
          entry.price = bid;
+         entry.sl = ask + (InpStopLossMultiple * mCAtrReader.atr(mRefShift));
         }
      }
 
@@ -166,6 +187,31 @@ Entry CStrategyImpl::FindEntry(const double ask, const double bid)
 //+------------------------------------------------------------------+
 void CStrategyImpl::CheckAndSetExitSignal(CPositionInfo &positionInfo, Position &position)
   {
+   ENUM_POSITION_TYPE posType = positionInfo.PositionType();
+   ENUM_ENTRY_SIGNAL superTrendState = ENTRY_SIGNAL_NONE;
+   double ask = SymbolInfoDouble(mSymbol, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(mSymbol, SYMBOL_BID);
+   double spread = ask - bid;
+   double profit = positionInfo.Profit();
+   bool inProfit = profit > (2 * spread);
+   double st1 = mCSuperTrend.GetData(mRefShift), st2 = mCSuperTrend.GetData(mRefShift+1);
+   superTrendState = mCSuperTrend.TradeSignal();
+
+   if(posType == POSITION_TYPE_BUY)
+     {
+      if(superTrendState == ENTRY_SIGNAL_SELL && inProfit)
+        {
+         position.signal = EXIT_SIGNAL_EXIT;
+        }
+     }
+   else
+      if(posType == POSITION_TYPE_SELL)
+        {
+         if(superTrendState == ENTRY_SIGNAL_BUY && inProfit)
+           {
+            position.signal = EXIT_SIGNAL_EXIT;
+           }
+        }
   }
 
 //+------------------------------------------------------------------+
@@ -175,16 +221,36 @@ void CStrategyImpl::Refresh(void)
   {
    if(IsNewBar())
      {
+      int barsToCopy = 10;
+
       for(int i = 0; i < 2; i++)
         {
          m_KetChanls[i].Refresh(mRefShift);
-         m_AdxWilders[i].Refresh(mRefShift);
+         m_Macds[i].Refresh(mRefShift);
         }
+      mCSuperTrend.Refresh(mRefShift);
      }
   }
 
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool CStrategyImpl::AtrFilter(void)
+  {
+   ENUM_HIGHLOW level = mCAtrReader.classifyATR();
+   return InpUseAtrFilter && level == HIGHLOW_HIGH;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+bool CStrategyImpl::VolumeFilter(void)
+  {
+   return IsVolumeAbovePriorPercentile(mSymbol, mTimeframe, mRefShift, 100, InpVolumePercentileFilter);
+  }
+
 // the expert to run our strategy
-CSingleExpert singleExpert(ExpertMagic, "...");
+CSingleExpert singleExpert(ExpertMagic, "MACD Crossovers with Filters+SuperTrend For Exit");
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -193,12 +259,8 @@ int OnInit()
   {
 //--- set up Trading Strategy Implementaion
    CStrategyImpl *strategy = new CStrategyImpl(_Symbol, InpTimeframe, InpLotSizeMultiple);
-   //CPositionManager *positionManager = CreatPositionManager(_Symbol, InpTimeframe,
-   //                                    InpPostManagmentType,
-   //                                    InpKcPeriod, InpStopLossPoints, InpBreakEvenPoints, InpTrailingOrTpPoints,
-   //                                    InpMaxLossAmount, InpScratchBreakEvenFlag, false, 5,
-   //                                    InpStopLossMultiple, InpTrailingOrTpMultiple, InpTrailingOrTpMultiple);
-   //strategy.SetPositionManager(positionManager);
+   CPositionManager *positionManager = new CMaxLossAmountPositionManager(_Symbol, InpTimeframe, InpMaxLossAmount);
+   strategy.SetPositionManager(positionManager);
    singleExpert.SetStrategyImpl(strategy);
 
    if(singleExpert.OnInitHandler())

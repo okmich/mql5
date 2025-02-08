@@ -7,12 +7,18 @@ import pytz
 
 from datetime import datetime
 
+broker = "Deriv"
+interested_symbols= ['Volatility 25 (1s) Index', 'Volatility 75 (1s) Index', 'Volatility 250 (1s) Index', 
+      'Step Index', 'Volatility 75 Index', 'EURJPY', 'BTCUSD', 'XAUUSD', 'EURUSD']
+valid_path_prefix = ['Crypto', 'Energies', 'ETFs', 'Forex Major', 'Forex Minor', 'Metals', 'Stock Indices', 
+      'Volatility Indices', 'Step Indices']
+
 is_synthetic = True
 timeframe = mt5.TIMEFRAME_M1 if is_synthetic else mt5.TIMEFRAME_M5
 timezone = pytz.timezone("Etc/GMT+2")
-date_from = datetime(2011, 1, 1, tzinfo=timezone)
-date_to = datetime(2022, 12, 31, hour = 23, minute=59, tzinfo=timezone)
-file_location = "C:\\Users\\okmic\\AppData\\Roaming\\MetaQuotes\\Terminal\\C734FF1CA4CACD5026FF92845253E847\\MQL5\\Files"
+date_from = datetime(2013, 10, 1, tzinfo=timezone)
+date_to = datetime(2024, 12, 31, hour = 23, minute=59, tzinfo=timezone)
+file_location = "C:\\Users\\okmic\\AppData\\Roaming\\MetaQuotes\\Terminal\\FB9A56D617EDDDFE29EE54EBEFFE96C1\\MQL5\\Files"
 dt_range_str = f"{date_to.strftime('%Y%m%d')}-{date_from.strftime('%Y%m%d')}"
 
 def download(sym, tf):
@@ -23,7 +29,8 @@ def download(sym, tf):
     rates_df = pd.DataFrame(rates)
     rates_df['time']=pd.to_datetime(rates_df['time'], unit='s')
 
-    rates_df.to_hdf(f"{file_location}\\market_data-5M-{dt_range_str}.hd5", key=sym.name, mode='a', complib='bzip2')
+    # rates_df.to_hdf(f"{file_location}\\market_data-5M-{dt_range_str}.hd5", key=sym.name, mode='a', complib='bzip2')
+    rates_df.to_parquet(f"{file_location}\\{sym.name}_{broker}_data-5M-{dt_range_str}.parquet")
     print(f"Copied rate data for '{sym.name}' from {date_from} to {date_to}")
 
 # establish MetaTrader 5 connection to a specified trading account
@@ -37,12 +44,13 @@ else : # fx
    symbols=mt5.symbols_get(group="!*SEK*,!*PLN*,!*micro*,!*.conv*")
 
 sorted(symbols)
-valid_path_prefix = ['Crypto', 'Energies', 'ETFs', 'Forex Major', 'Forex Minor', 'Metals', 'Stock Indices']
+
 count = 0
 for sym in symbols:
    sym_path = sym.path.split("\\")[0]
-   if sym_path in valid_path_prefix:
-      # download(sym, timeframe)
+   instr_name = sym.path.split("\\")[1]
+   if sym_path in valid_path_prefix and instr_name in interested_symbols:
+      download(sym, timeframe)
       print(f"name: {sym.name}, path={sym.path}")
       count = count + 1
    

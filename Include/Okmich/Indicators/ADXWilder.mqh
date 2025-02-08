@@ -34,7 +34,7 @@ private :
 
 public:
                      CADXWilder(string symbol, ENUM_TIMEFRAMES period, int InputDmiPeriod=13,
-              int InputAdxPeriod=8, double significantSlope=15, double trendThreshold=25,
+              int InputAdxPeriod=8, double trendThreshold=25, double significantSlope=15,
               double rangeThreshold=20, int historyBars=10): CBaseIndicator(symbol, period)
      {
       m_DmiPeriod = InputDmiPeriod;
@@ -55,11 +55,11 @@ public:
    ENUM_TRENDSTATE    TrendState();
    bool               IsTrending();
    int                DmState(); //+1, -1 or 0
-   int                Dominance(int shift = 1); //+1, -1 or 0
+   int                Dominance(int shift = 1, int threshold = -1); //+1, -1 or 0
    int                DmContractionExtraction(); // +1 => expansion, -1, contraction, 0 - align
    int                Shape(); // +1 => expansion, -1, contraction, 0 - align
-   
-   ENUM_ENTRY_SIGNAL  DominantCrossOverWithRisingDX();
+
+   ENUM_ENTRY_SIGNAL  DominantCrossOverWithRisingDX(int threshold = -1);
   };
 
 //+------------------------------------------------------------------+
@@ -201,16 +201,17 @@ bool CADXWilder::IsTrending(void)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-int CADXWilder::Dominance(int shift = 1)
+int CADXWilder::Dominance(int shift = 1, int threshold = -1)
   {
+   double thresh = (threshold == -1) ? mTrendIndx : threshold;
 //both dmi are below mTrendIndx
-   if(mDmiPlusBuffer[shift] < mTrendIndx && mDmiMinusBuffer[shift] < mTrendIndx)
+   if(mDmiPlusBuffer[shift] < thresh && mDmiMinusBuffer[shift] < thresh)
       return 0;
 //di+ is above mTrendIndx and greater than di-
-   if(mDmiPlusBuffer[shift] > mTrendIndx && mDmiPlusBuffer[shift] > mDmiMinusBuffer[shift])
+   if(mDmiPlusBuffer[shift] > thresh && mDmiPlusBuffer[shift] > mDmiMinusBuffer[shift])
       return 1;
 //di- is above mTrendIndx and greater than di+
-   if(mDmiMinusBuffer[shift] > mTrendIndx && mDmiMinusBuffer[shift] > mDmiPlusBuffer[shift])
+   if(mDmiMinusBuffer[shift] > thresh && mDmiMinusBuffer[shift] > mDmiPlusBuffer[shift])
       return -1;
 
    return 0;
@@ -254,9 +255,9 @@ int CADXWilder::DmContractionExtraction(void)
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
-ENUM_ENTRY_SIGNAL CADXWilder::DominantCrossOverWithRisingDX(void)
+ENUM_ENTRY_SIGNAL CADXWilder::DominantCrossOverWithRisingDX(int threshold = -1)
   {
-   int dominance = Dominance();
+   int dominance = Dominance(m_ShiftToUse, threshold);
    if(dominance == 0)
       return ENTRY_SIGNAL_NONE;
 

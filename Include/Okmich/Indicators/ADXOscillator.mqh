@@ -26,7 +26,7 @@ private :
    double             mTrendIndx;
 
    //--- indicator paramter
-   int                m_AdxPeriod;
+   int                m_DmiPeriod, m_AdxPeriod;
    //--- indicator
    int                m_AdxHandle;
    //--- indicator buffer
@@ -38,10 +38,11 @@ private :
 
 public:
                      CADXOscillator(string symbol, ENUM_TIMEFRAMES period,
-                  int InputAdxPeriod=14, double trendThreshold=20,
+                  int InputDmiPeriod=14, int InputAdxPeriod=14, double trendThreshold=20,
                   double signficantSlope=3.0, int slopePeriod = 3,
                   int historyBars=24): CBaseIndicator(symbol, period)
      {
+      m_DmiPeriod = InputDmiPeriod;
       m_AdxPeriod = InputAdxPeriod;
       mTrendIndx = trendThreshold;
       mSlopePeriod = slopePeriod;
@@ -74,7 +75,7 @@ bool CADXOscillator::Init(void)
    ArraySetAsSeries(m_DnBuffer, true);
    ArraySetAsSeries(m_DpBuffer, true);
 
-   m_AdxHandle = iCustom(m_Symbol, m_TF, "Okmich\\ADX Oscillator", m_AdxPeriod);
+   m_AdxHandle = iCustom(m_Symbol, m_TF, "Okmich\\ADX Oscillator", m_DmiPeriod, m_AdxPeriod);
    return m_AdxHandle != INVALID_HANDLE;
   }
 
