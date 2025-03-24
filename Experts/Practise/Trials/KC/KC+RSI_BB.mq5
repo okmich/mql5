@@ -19,7 +19,7 @@ input ENUM_TIMEFRAMES InpTimeframe = PERIOD_CURRENT;             //Timeframe
 input ENUM_LONG_SHORT_FLAG InpLongShortFlag = LONG_SHORT;   //Long/Short Flag
 
 input group "********* Trigger settings *********";
-input ENUM_RsiBB_Strategies InpTriggerType = RsiBB_RsiBBMid_Crossover; //Trigger type
+input ENUM_RsiBB_Strategies InpTriggerType = RsiBB_RsiBBObOsExit; //Trigger type
 input int      InpRsiPeriod=14;        // RSI Period
 input int      InpBBMaPeriod=20;       // BB Period
 input double   InpBBDeviation=2.0;     // BB Deviation
@@ -27,14 +27,14 @@ input int      InpRsiSignal=5;         // RSI Signal
 
 input group "********* Long Filter settings *********";
 input ENUM_KTC_FILTER InpLongHowToFilter = KTC_FILTER_ABOVE_BELOW_BAND; //Filter strategy
-input int            InpLongKcPeriod=32;            //KC Long period
-input double         InpLongKcAtrMultiplier=2.0;    //KC Long ATR multiplier
+input int            InpLongKcPeriod=55;            //KC Long period
+input double         InpLongKcAtrMultiplier=0.5;    //KC Long ATR multiplier
 input ENUM_MA_TYPE   InpLongKcMaMethod=MA_TYPE_EMA; //KC Long MA Type
 
 input group "********* Short Filter settings *********";
 input ENUM_KTC_FILTER InpShortHowToFilter = KTC_FILTER_ABOVE_BELOW_BAND; //Short Filter strategy
-input int            InpShortKcPeriod=32;            //KC Short period
-input double         InpShortKcAtrMultiplier=2.0;    //KC Short ATR multiplier
+input int            InpShortKcPeriod=55;            //KC Short period
+input double         InpShortKcAtrMultiplier=0.5;    //KC Short ATR multiplier
 input ENUM_MA_TYPE   InpShortKcMaMethod=MA_TYPE_EMA; //KC Short MA Type
 
 input group "********* Exit Trigger **********";
@@ -49,11 +49,11 @@ input int InpATRPeriod = 14;                          // ATR Period
 input double InpStopLossPoints = -1;                  // Stop loss distance in points
 input double InpBreakEvenPoints = -1;                 // Points to Break-even
 input double InpTrailingOrTpPoints = -1;              // Trailing/Take profit points
-input double InpMaxLossAmount = 100.00;               // Maximum allowable loss in dollars
+input double InpMaxLossAmount = 50.00;               // Maximum allowable loss in dollars
 input bool InpScratchBreakEvenFlag = true;            // Enable break-even with scratch profit
-input double InpStopLossMultiple = 2;                 // ATR multiple for stop loss
-input double InpBreakEvenMultiple = 1;                // ATR multiple for break-even
-input double InpTrailingOrTpMultiple = 2;             // ATR multiple for Maximum floating/Take profit
+input double InpStopLossMultiple = 3;                 // ATR multiple for stop loss
+input double InpBreakEvenMultiple = 3;                // ATR multiple for break-even
+input double InpTrailingOrTpMultiple = 6;             // ATR multiple for Maximum floating/Take profit
 
 input group "********* Other settings *********";
 input ulong    ExpertMagic           = 1892883;              //Expert MagicNumbers
@@ -224,7 +224,11 @@ CSingleExpert singleExpert(ExpertMagic, "...");
 int OnInit()
   {
 //--- set up Position manager Implementaion
-   CPositionManager *positionManager = new CNoPositionManager(_Symbol, _Period);
+   CPositionManager *positionManager = CreatPositionManager(_Symbol, InpTimeframe,
+                                       InpPostManagmentType, InpATRPeriod,
+                                       InpStopLossPoints, InpBreakEvenPoints, InpTrailingOrTpPoints,
+                                       InpMaxLossAmount, InpScratchBreakEvenFlag, false, 50,
+                                       InpStopLossMultiple, InpTrailingOrTpMultiple, InpTrailingOrTpMultiple);
 
 //--- set up Trading Strategy Implementaion
    CStrategyImpl *strategy = new CStrategyImpl(_Symbol, _Period);

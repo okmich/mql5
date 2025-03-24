@@ -67,11 +67,12 @@ void CFlexiblePositionManager::manageLongPosition(CTrade &mTradeHandle, CPositio
    double symPoint = mSymbolInfo.Point();
    double stopLoss = positionInfo.StopLoss();
    double openPrice = positionInfo.PriceOpen();
+   double spread = iSpread(mSymbolInfo.Name(), mTimeframe, 0);
 //--- if stop is not set, then set it
    if(stopLoss == 0 || stopLoss == EMPTY_VALUE)
      {
       double stopLossDist = mUseHiddenStopLoss ?  mStopLossPoints * mHiddenStopLossMultiple : mStopLossPoints;
-      stopLoss = openPrice - (stopLossDist *symPoint);
+      stopLoss = openPrice - ((stopLossDist + spread) *symPoint);
       if(ModifyPosition(mTradeHandle, positionInfo.Ticket(), stopLoss, positionInfo.TakeProfit()))
          return;
      }
@@ -109,11 +110,12 @@ void CFlexiblePositionManager::manageShortPosition(CTrade &mTradeHandle, CPositi
    double symPoint = mSymbolInfo.Point();
    double stopLoss = positionInfo.StopLoss();
    double openPrice = positionInfo.PriceOpen();
+   double spread = iSpread(mSymbolInfo.Name(), mTimeframe, 0);
 //--- if stop is not set, then set it
    if(stopLoss == 0 || stopLoss == EMPTY_VALUE)
      {
       double stopLossDist = mUseHiddenStopLoss ?  mStopLossPoints * mHiddenStopLossMultiple : mStopLossPoints;
-      stopLoss = openPrice + (stopLossDist * mSymbolInfo.Point());
+      stopLoss = openPrice + ((stopLossDist + spread) * mSymbolInfo.Point());
       if(ModifyPosition(mTradeHandle, positionInfo.Ticket(), stopLoss, positionInfo.TakeProfit()))
          return;
      }

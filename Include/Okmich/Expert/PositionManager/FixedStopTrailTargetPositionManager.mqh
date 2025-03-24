@@ -54,17 +54,19 @@ void CFixedStopTrailTargetPositionManager::manageLongPosition(CTrade &mTradeHand
    double stopLoss = positionInfo.StopLoss();
    double takeProfit = positionInfo.TakeProfit();
    double openPrice = positionInfo.PriceOpen();
+   double bidPrice = mSymbolInfo.Bid();
 //--- if stop is not set, then set it
    if(stopLoss == 0 || stopLoss == EMPTY_VALUE || takeProfit == 0 || takeProfit == EMPTY_VALUE)
      {
-      double newStopLoss = openPrice - (stopLossDist * symPoint);
+      double spread = mSymbolInfo.Spread();
+      double newStopLoss = openPrice - ((stopLossDist + spread) * symPoint);
       double newTakeProfit = openPrice + (takeProfitDist * symPoint);
       if(ModifyPosition(mTradeHandle, positionInfo.Ticket(), newStopLoss, newTakeProfit))
          return;
      }
-   double currentPrice = positionInfo.PriceCurrent();
-   double pointsFromSL = (currentPrice - stopLoss)/symPoint;
-   double newSl = currentPrice - (stopLossDist * symPoint);
+
+   double pointsFromSL = (bidPrice - stopLoss)/symPoint;
+   double newSl = bidPrice - (stopLossDist * symPoint);
    if(pointsFromSL > mBreakEvenPoints && stopLoss < newSl && positionInfo.Profit() > 0)
      {
       //modify position
@@ -87,18 +89,20 @@ void CFixedStopTrailTargetPositionManager::manageShortPosition(CTrade &mTradeHan
    double stopLoss = positionInfo.StopLoss();
    double takeProfit = positionInfo.TakeProfit();
    double openPrice = positionInfo.PriceOpen();
+   double askPrice = mSymbolInfo.Ask();
 //--- if stop is not set, then set it
    if(stopLoss == 0 || stopLoss == EMPTY_VALUE || takeProfit == 0 || takeProfit == EMPTY_VALUE)
      {
-      double newStopLoss = openPrice + (stopLossDist * symPoint);
+      double spread = mSymbolInfo.Spread();
+      double newStopLoss = openPrice + ((stopLossDist + spread) * symPoint);
       double newTakeProfit = openPrice - (takeProfitDist * symPoint);
       if(ModifyPosition(mTradeHandle, positionInfo.Ticket(), newStopLoss, newTakeProfit))
          return;
      }
-   double currentPrice = positionInfo.PriceCurrent();
-   double pointsFromSL = (stopLoss - currentPrice)/symPoint;
-   double newSl = currentPrice + (stopLossDist * symPoint);
-   if(pointsFromSL > (mBreakEvenPoints+stopLossDist) && stopLoss > newSl && positionInfo.Profit() > 0)
+
+   double pointsFromSL = (stopLoss - askPrice)/symPoint;
+   double newSl = askPrice + (stopLossDist * symPoint);
+   if(pointsFromSL > mBreakEvenPoints && stopLoss > newSl && positionInfo.Profit() > 0)
      {
       //modify position
       if(ModifyPosition(mTradeHandle, positionInfo.Ticket(), newSl, positionInfo.TakeProfit()))

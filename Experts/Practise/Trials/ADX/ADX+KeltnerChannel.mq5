@@ -15,24 +15,24 @@
 //| Input parameters                                                 |
 //+------------------------------------------------------------------+
 input group "********* Strategy settings *********";
-input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M4;             //Timeframe
+input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M5;             //Timeframe
 input ENUM_LONG_SHORT_FLAG InpLongShortFlag = LONG_SHORT;   //Long/Short Flag
 
 input group "********* Long Strategy settings *********";
 input int      InpLongKcPeriod=20;
-input double   InpLongKcAtrMultiplier=2.0;
+input double   InpLongKcAtrMultiplier=1.0;
 input ENUM_MA_TYPE      InpLongKcMaMethod=MA_TYPE_EMA;
 input int InpLongDMIPeriod = 13;
 input int InpLongADXPeriod = 8;
-input int InpLongADXLevel = 25;
+input int InpLongADXLevel = 23;
 
 input group "********* Short Strategy settings *********";
 input int      InpShortKcPeriod=20;
-input double   InpShortKcAtrMultiplier=2.0;
+input double   InpShortKcAtrMultiplier=1.0;
 input ENUM_MA_TYPE      InpShortKcMaMethod=MA_TYPE_EMA;
 input int InpShortDMIPeriod = 13;
-input int InpShortADXPeriod = 8;
-input int InpShortADXLevel = 25;
+input int InpShortADXPeriod = 13;
+input int InpShortADXLevel = 23;
 
 input group "********* Volume setting **********";
 input int InpLotSizeMultiple = 1;                     //Multiple of minimum lot size
@@ -46,8 +46,8 @@ input double InpTrailingOrTpPoints = -1;              // Trailing/Take profit po
 input double InpMaxLossAmount = 100.00;               // Maximum allowable loss in dollars
 input bool InpScratchBreakEvenFlag = true;            // Enable break-even with scratch profit
 input double InpStopLossMultiple = 2.5;               // ATR multiple for stop loss
-input double InpBreakEvenMultiple = 10;                // ATR multiple for break-even
-input double InpTrailingOrTpMultiple = 10;             // ATR multiple for Maximum floating/Take profit
+input double InpBreakEvenMultiple = 10;               // ATR multiple for break-even
+input double InpTrailingOrTpMultiple = 10;            // ATR multiple for Maximum floating/Take profit
 
 input group "********* Other settings *********";
 input ulong    ExpertMagic           = 980023;              //Expert MagicNumbers
@@ -62,7 +62,7 @@ private :
    //--- indicator settings
    //--- indicators
    CKeltnerChannel   *m_KetChanls[2];
-   CADXWilder         *m_AdxWilders[2];
+   CADXWilder         *m_AdxWilder;
    //-- others
 
 protected:
@@ -94,12 +94,10 @@ bool CStrategyImpl::Init(ulong magic)
    m_KetChanls[1] = new CKeltnerChannel(mSymbol, mTimeframe, InpShortKcPeriod, InpShortKcMaMethod,
                                         InpShortKcAtrMultiplier, PRICE_CLOSE);
    bool kcInited = m_KetChanls[0].Init() && m_KetChanls[1].Init();
-//--- m_AdxWilders
-   m_AdxWilders[0] = new CADXWilder(mSymbol, mTimeframe, InpLongDMIPeriod, InpLongADXPeriod, InpLongADXLevel, 15);
-   m_AdxWilders[1] = new CADXWilder(mSymbol, mTimeframe, InpShortDMIPeriod, InpShortADXPeriod, InpShortADXLevel, 15);
-   bool maInited = m_AdxWilders[0].Init() && m_AdxWilders[1].Init();
+//--- m_AdxWilder
+   m_AdxWilder = new CADXWilder(mSymbol, mTimeframe, InpLongDMIPeriod, InpLongADXPeriod, InpLongADXLevel, 15);
 
-   return kcInited && maInited;
+   return kcInited && m_AdxWilder.Init();
   }
 
 //+------------------------------------------------------------------+
@@ -110,11 +108,12 @@ void CStrategyImpl::Release(void)
    for(int i = 0; i < 2; i++)
      {
       m_KetChanls[i].Release();
-      m_AdxWilders[i].Release();
 
       delete m_KetChanls[i];
-      delete m_AdxWilders[i];
      }
+
+   m_AdxWilder.Release();
+   delete m_AdxWilder;
   }
 
 //+------------------------------------------------------------------+
@@ -125,12 +124,13 @@ Entry CStrategyImpl::FindEntry(const double ask, const double bid)
    Entry entry = noEntry();
    if(!mIsNewBar)
       return entry;
-   
+
+   ENUM_ENTRY_SIGNAL dmiSignal = ENTRY_SIGNAL_NONE;
 //--- implement entry logic
    if(SupportLongEntries(InpLongShortFlag))
      {
       ENUM_ENTRY_SIGNAL ktcFilter = m_KetChanls[0].TradeFilter(KTC_FILTER_ABOVE_BELOW_BAND);
-      ENUM_ENTRY_SIGNAL dmiSignal = m_AdxWilders[0].DominantCrossOverWithRisingDX();
+      dmiSignal = m_AdxWilder.DominantCrossOverWithRisingDX();
 
       if(ktcFilter == dmiSignal && dmiSignal == ENTRY_SIGNAL_BUY)
         {
@@ -142,8 +142,8 @@ Entry CStrategyImpl::FindEntry(const double ask, const double bid)
    if(SupportShortEntries(InpLongShortFlag))
      {
       ENUM_ENTRY_SIGNAL ktcFilter = m_KetChanls[1].TradeFilter(KTC_FILTER_ABOVE_BELOW_BAND);
-      ENUM_ENTRY_SIGNAL dmiSignal = m_AdxWilders[1].DominantCrossOverWithRisingDX();
-      
+      dmiSignal = m_AdxWilder.DominantCrossOverWithRisingDX();
+
       if(ktcFilter == dmiSignal && dmiSignal == ENTRY_SIGNAL_SELL)
         {
          entry.signal = dmiSignal;
@@ -178,9 +178,9 @@ void CStrategyImpl::Refresh(void)
       for(int i = 0; i < 2; i++)
         {
          m_KetChanls[i].Refresh(mRefShift);
-         m_AdxWilders[i].Refresh(mRefShift);
         }
      }
+   m_AdxWilder.Refresh(mRefShift);
   }
 
 // the expert to run our strategy
@@ -193,12 +193,12 @@ int OnInit()
   {
 //--- set up Trading Strategy Implementaion
    CStrategyImpl *strategy = new CStrategyImpl(_Symbol, InpTimeframe, InpLotSizeMultiple);
-   //CPositionManager *positionManager = CreatPositionManager(_Symbol, InpTimeframe,
-   //                                    InpPostManagmentType,
-   //                                    InpKcPeriod, InpStopLossPoints, InpBreakEvenPoints, InpTrailingOrTpPoints,
-   //                                    InpMaxLossAmount, InpScratchBreakEvenFlag, false, 5,
-   //                                    InpStopLossMultiple, InpTrailingOrTpMultiple, InpTrailingOrTpMultiple);
-   //strategy.SetPositionManager(positionManager);
+//CPositionManager *positionManager = CreatPositionManager(_Symbol, InpTimeframe,
+//                                    InpPostManagmentType,
+//                                    InpKcPeriod, InpStopLossPoints, InpBreakEvenPoints, InpTrailingOrTpPoints,
+//                                    InpMaxLossAmount, InpScratchBreakEvenFlag, false, 5,
+//                                    InpStopLossMultiple, InpTrailingOrTpMultiple, InpTrailingOrTpMultiple);
+//strategy.SetPositionManager(positionManager);
    singleExpert.SetStrategyImpl(strategy);
 
    if(singleExpert.OnInitHandler())

@@ -16,7 +16,7 @@ input ulong    ExpertMagic           = 980023;              //Expert MagicNumber
 //| Input parameters                                                 |
 //+------------------------------------------------------------------+
 input group "********* Strategy settings *********";
-input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;             //Timeframe
+input ENUM_TIMEFRAMES InpTimeframe = PERIOD_CURRENT;             //Timeframe
 input ENUM_LONG_SHORT_FLAG InpLongShortFlag = LONG_SHORT;   //Long/Short Flag
 input bool InpUseExitFlag = true; //Use exit flag
 

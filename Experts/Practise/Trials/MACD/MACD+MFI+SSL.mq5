@@ -1,52 +1,70 @@
 //+------------------------------------------------------------------+
-//|                                                  KC+AscTrend.mq5 |
-//|                                    Copyright 2024, Michael Enudi |
+//|                                                 MACD+MFI+SSL.mq5 |
+//|                                    Copyright 2025, Michael Enudi |
 //|                                             okmich2002@yahoo.com |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2024, Michael Enudi"
+#property copyright "Copyright 2025, Michael Enudi"
 #property link      "okmich2002@yahoo.com"
 #property version   "1.00"
 
 #include <Okmich\Expert\SingleExpert.mqh>
-#include <Okmich\Indicators\KeltnerChannel.mqh>
-#include <Okmich\Indicators\AscTrend.mqh>
+#include <Okmich\Indicators\macd.mqh>
+#include <Okmich\Indicators\mfi.mqh>
+#include <Okmich\Indicators\SSL.mqh>
+
+enum ENUM_MACD_RSI_Strategy
+  {
+   MACD_FILTER_RSI_TRIGGER,
+   MACD_DIVERGENCE_RSI_OB_OS,
+   MACD_HIST_RSI_MOMENTUM_SHIFT,
+   MACD_RSI_CYCLE_SYNC
+  };
 
 //+------------------------------------------------------------------+
 //| Input parameters                                                 |
 //+------------------------------------------------------------------+
-input group "********* Settings *********";
+input group "********* Strategy settings *********";
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_CURRENT;             //Timeframe
 input ENUM_LONG_SHORT_FLAG InpLongShortFlag = LONG_SHORT;   //Long/Short Flag
 
+input group "********* General Strategy settings *********";
+input ENUM_MACD_RSI_Strategy InpStrategyType = MACD_FILTER_RSI_TRIGGER; //Strategy type
+input int      InpFastMaPeriod=12;
+input int      InpSlowMaPeriod=26;
+input int      InpSignalPeriod=9;
+
+input ENUM_MFI_Strategies InpMfiHowToEnter = MFI_EnterOsOBLevels; //Entry Signal
+input int         InpMfiPeriod=12;
+
 input group "********* Long Strategy settings *********";
-input ENUM_KTC_FILTER InpLongHowToFilter = KTC_FILTER_ABOVE_BELOW_BAND; //Filter strategy
-input int            InpLongKcPeriod=55;            //KC Long period
-input double         InpLongKcAtrMultiplier=1.0;    //KC Long ATR multiplier
-input ENUM_MA_TYPE   InpLongKcMaMethod=MA_TYPE_EMA; //KC Long MA Type
-input int            InpLongAscTrendRisk=10;          //Long AscTrend Risk
+input double      InpLongMfiOBLevel=80;
+input double      InpLongMfiOSLevel=20;
 
 input group "********* Short Strategy settings *********";
-input ENUM_KTC_FILTER InpShortHowToFilter = KTC_FILTER_ABOVE_BELOW_BAND; //Short Filter strategy
-input int            InpShortKcPeriod=55;            //KC Short period
-input double         InpShortKcAtrMultiplier=1.0;    //KC Short ATR multiplier
-input ENUM_MA_TYPE   InpShortKcMaMethod=MA_TYPE_EMA; //KC Short MA Type
-input int            InpShortAscTrendRisk=10;        //Short AscTrend Risk
+input double      InpShortMfiOBLevel=80;
+input double      InpShortMfiOSLevel=20;
+
+input group "********* Exit Strategy settings *********";
+input int      InpSslMaPeriod=20;                        // Period
+input ENUM_SSL_MODE      InpSslMaMethod=MODE_SSL_EMA;    // Smoothing Method
 
 input group "********* Volume setting **********";
 input int InpLotSizeMultiple = 1;                     //Multiple of minimum lot size
 
 input group "********* Position management settings *********";
 input ENUM_POSITION_MANAGEMENT InpPostManagmentType = POSITION_MGT_FIXED_SL_TRAIL_TP_ATR;  // Type of Position Management Algorithm
+input int InpATRPeriod = 60;                          // ATR Period (Required)
 input double InpStopLossPoints = -1;                  // Stop loss distance in points
 input double InpBreakEvenPoints = -1;                 // Points to Break-even
 input double InpTrailingOrTpPoints = -1;              // Trailing/Take profit points
-input double InpMaxLossAmount = 40.00;                // Maximum allowable loss in dollars
+input double InpMaxLossAmount = 100.00;               // Maximum allowable loss in dollars
 input bool InpScratchBreakEvenFlag = true;            // Enable break-even with scratch profit
-input double InpStopLossMultiple = 4;                 // ATR multiple for stop loss
-input double InpBreakEvenMultiple = 4;                // ATR multiple for break-even
-input double InpTrailingOrTpMultiple = 16;            // ATR multiple for Maximum floating/Take profit
+input double InpStopLossMultiple = 3.0;               // ATR multiple for stop loss
+input double InpBreakEvenMultiple = -1;               // ATR multiple for break-even
+input double InpTrailingOrTpMultiple = 2.0;           // ATR multiple for Maximum floating/Take profit
 
-input ulong    ExpertMagic           = 874632452;     //Expert MagicNumbers
+input group "********* Other settings **********";
+input ulong    ExpertMagic           = 4523485723;    //Expert MagicNumbers
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -57,9 +75,16 @@ private :
    //--- indicator values
    //--- indicator settings
    //--- indicators
-   CKeltnerChannel   *m_KetChanl[2];
-   CAscTrend         *m_AscTrends[2];
+   CMfi              *m_Mfi;
+   CMacd             *m_Macd;
+   CSsl              *m_Ssl;
+
    //-- others
+
+   ENUM_ENTRY_SIGNAL macdZeroLineFilterMfiObosFilter();
+   ENUM_ENTRY_SIGNAL macdDivergenceMfiObOs();
+   ENUM_ENTRY_SIGNAL macdHistogramMfiMomentum();
+   ENUM_ENTRY_SIGNAL macdMfiCycleSync(void);
 
 protected:
    virtual Entry     FindEntry(const double ask, const double bid);
@@ -84,18 +109,14 @@ public:
 bool CStrategyImpl::Init(ulong magic)
   {
    CStrategy::Init(magic);
-//--- m_KetChanl
-   m_KetChanl[0] = new CKeltnerChannel(mSymbol, mTimeframe, InpLongKcPeriod, InpLongKcMaMethod,
-                                       InpLongKcAtrMultiplier,PRICE_CLOSE);
-   m_KetChanl[1] = new CKeltnerChannel(mSymbol, mTimeframe, InpShortKcPeriod, InpShortKcMaMethod,
-                                       InpShortKcAtrMultiplier,PRICE_CLOSE);
-   bool kcInited = m_KetChanl[0].Init() && m_KetChanl[1].Init();
-//--- m_AscTrends
-   m_AscTrends[0] = new CAscTrend(mSymbol, mTimeframe, InpLongAscTrendRisk, 10);
-   m_AscTrends[1] = new CAscTrend(mSymbol, mTimeframe, InpShortAscTrendRisk, 10);
+//--- m_Mfi
+   m_Mfi = new CMfi(mSymbol, mTimeframe, InpMfiPeriod);
+//--- m_Macd
+   m_Macd = new CMacd(mSymbol, mTimeframe, InpFastMaPeriod, InpSlowMaPeriod, InpSignalPeriod);
+//--- m_Ssl
+   m_Ssl = new CSsl(mSymbol, mTimeframe, InpSslMaPeriod, InpSslMaMethod);
 
-   bool m_AscTrendInited = m_AscTrends[0].Init() && m_AscTrends[1].Init();
-   return kcInited && m_AscTrendInited;
+   return m_Mfi.Init() && m_Macd.Init() && m_Ssl.Init();
   }
 
 //+------------------------------------------------------------------+
@@ -103,14 +124,14 @@ bool CStrategyImpl::Init(ulong magic)
 //+------------------------------------------------------------------+
 void CStrategyImpl::Release(void)
   {
-   for(int i = 0; i < 2; i++)
-     {
-      m_AscTrends[i].Release();
-      m_KetChanl[i].Release();
+   m_Macd.Release();
+   delete m_Macd;
 
-      delete m_AscTrends[i];
-      delete m_KetChanl[i];
-     }
+   m_Mfi.Release();
+   delete m_Mfi;
+
+   m_Ssl.Release();
+   delete m_Ssl;
   }
 
 //+------------------------------------------------------------------+
@@ -122,29 +143,34 @@ Entry CStrategyImpl::FindEntry(const double ask, const double bid)
    if(!mIsNewBar)
       return entry;
 
-//--- implement entry logic
-   if(SupportLongEntries(InpLongShortFlag))
+   ENUM_ENTRY_SIGNAL signal = ENTRY_SIGNAL_NONE;
+   switch(InpStrategyType)
      {
-      ENUM_ENTRY_SIGNAL stochSignal = m_AscTrends[0].TradeSignal();
-      ENUM_ENTRY_SIGNAL filterSignal = m_KetChanl[0].TradeFilter(InpLongHowToFilter);
+      case MACD_DIVERGENCE_RSI_OB_OS:
+         signal = macdDivergenceMfiObOs();
+         break;
+      case MACD_FILTER_RSI_TRIGGER:
+         signal = macdZeroLineFilterMfiObosFilter();
+         break;
+      case MACD_HIST_RSI_MOMENTUM_SHIFT:
+         signal = macdHistogramMfiMomentum();
+         break;
+      case MACD_RSI_CYCLE_SYNC:
+         signal = macdMfiCycleSync();
+         break;
+     };
 
-      if(filterSignal == stochSignal && stochSignal == ENTRY_SIGNAL_BUY)
-        {
-         entry.signal = stochSignal;
-         entry.price = ask;
-        }
+//--- implement entry logic
+   if(SupportLongEntries(InpLongShortFlag) && signal == ENTRY_SIGNAL_BUY)
+     {
+      entry.signal = signal;
+      entry.price = ask;
      }
 
-   if(SupportShortEntries(InpLongShortFlag))
+   if(SupportShortEntries(InpLongShortFlag) && signal == ENTRY_SIGNAL_SELL)
      {
-      ENUM_ENTRY_SIGNAL stochSignal = m_AscTrends[1].TradeSignal();
-      ENUM_ENTRY_SIGNAL filterSignal = m_KetChanl[1].TradeFilter(InpShortHowToFilter);
-
-      if(filterSignal == stochSignal && stochSignal == ENTRY_SIGNAL_SELL)
-        {
-         entry.signal = stochSignal;
-         entry.price = bid;
-        }
+      entry.signal = signal;
+      entry.price = bid;
      }
 
    if(entry.signal != ENTRY_SIGNAL_NONE)
@@ -163,50 +189,14 @@ Entry CStrategyImpl::FindEntry(const double ask, const double bid)
 void CStrategyImpl::CheckAndSetExitSignal(CPositionInfo &positionInfo, Position &position)
   {
    ENUM_POSITION_TYPE posType = positionInfo.PositionType();
-   //ENUM_ENTRY_SIGNAL signal;
-
    if(posType == POSITION_TYPE_BUY)
      {
-      //filterSignal = GetFilterSignal(m_KetChanl[0], mRefShift, posType, InpLongHowToFilter);
-      ENUM_ENTRY_SIGNAL trgSignal = m_AscTrends[0].TradeSignal();
-      if(trgSignal == ENTRY_SIGNAL_SELL)
-        {
-         position.signal = EXIT_SIGNAL_EXIT;
-        }
      }
    else
       if(posType == POSITION_TYPE_SELL)
         {
-         //filterSignal = GetFilterSignal(m_KetChanl[1], mRefShift, posType, InpShortHowToFilter);
-         ENUM_ENTRY_SIGNAL trgSignal = m_AscTrends[1].TradeSignal();
-         if(trgSignal == ENTRY_SIGNAL_BUY)
-           {
-            position.signal = EXIT_SIGNAL_EXIT;
-           }
         }
   }
-
-
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-ENUM_ENTRY_SIGNAL GetFilterSignal(CKeltnerChannel *m_KetChanl, int mRefShift, ENUM_POSITION_TYPE posType,
-                                  ENUM_KTC_FILTER inpHowToFilter)
-  {
-   ENUM_ENTRY_SIGNAL filterSignal;
-   if(inpHowToFilter == KTC_FILTER_ABOVE_BELOW_BAND_2)
-     {
-      ENUM_ENTRY_SIGNAL currentState = posType == POSITION_TYPE_BUY ? ENTRY_SIGNAL_BUY :
-                                       posType == POSITION_TYPE_SELL ? ENTRY_SIGNAL_SELL: ENTRY_SIGNAL_NONE;
-      filterSignal = m_KetChanl.AboveBelowExtremeBandFilter(currentState, mRefShift);
-     }
-   else
-     {
-      filterSignal = m_KetChanl.TradeFilter(inpHowToFilter);
-     }
-   return filterSignal;
-  }
-
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -215,16 +205,81 @@ void CStrategyImpl::Refresh(void)
   {
    if(IsNewBar())
      {
-      for(int i = 0; i < 2; i++)
-        {
-         m_AscTrends[i].Refresh(mRefShift);
-         m_KetChanl[i].Refresh(mRefShift);
-        }
+      int barsToCopy = 10;
+
+      m_Macd.Refresh(mRefShift);
+      m_Mfi.Refresh(mRefShift);
+      m_Ssl.Refresh(mRefShift);
      }
   }
 
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+ENUM_ENTRY_SIGNAL CStrategyImpl::macdDivergenceMfiObOs(void)
+  {
+   if(m_Macd.Divergence(mRefShift, true))
+     {
+      m_Mfi.SetLevels(InpLongMfiOBLevel, InpLongMfiOSLevel);
+      return m_Mfi.TradeSignal(InpMfiHowToEnter);
+     }
+
+   else
+      if(m_Macd.Divergence(mRefShift, false))
+        {
+         m_Mfi.SetLevels(InpShortMfiOBLevel, InpShortMfiOSLevel);
+         return m_Mfi.TradeSignal(InpMfiHowToEnter);
+        }
+      else
+         return ENTRY_SIGNAL_NONE;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+ENUM_ENTRY_SIGNAL CStrategyImpl::macdHistogramMfiMomentum(void)
+  {
+   double rsi = m_Mfi.GetData(mRefShift);
+   ENUM_ENTRY_SIGNAL macdSignal = m_Macd.TradeSignal(MACD_OsMA);
+
+   return macdSignal == ENTRY_SIGNAL_BUY && rsi > 50.0 ? macdSignal :
+          macdSignal == ENTRY_SIGNAL_SELL && rsi < 50.0 ? macdSignal : ENTRY_SIGNAL_NONE;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+ENUM_ENTRY_SIGNAL CStrategyImpl::macdZeroLineFilterMfiObosFilter(void)
+  {
+   ENUM_ENTRY_SIGNAL macdFilter = m_Macd.TradeFilter(MACD_ZeroLineCrossover);
+   if(macdFilter == ENTRY_SIGNAL_BUY)
+     {
+      m_Mfi.SetLevels(InpLongMfiOBLevel, InpLongMfiOSLevel);
+      return m_Mfi.TradeSignal(InpMfiHowToEnter);
+     }
+   else
+      if(macdFilter == ENTRY_SIGNAL_SELL)
+        {
+         m_Mfi.SetLevels(InpShortMfiOBLevel, InpShortMfiOSLevel);
+         return m_Mfi.TradeSignal(InpMfiHowToEnter);
+        }
+      else
+         return ENTRY_SIGNAL_NONE;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+ENUM_ENTRY_SIGNAL CStrategyImpl::macdMfiCycleSync(void)
+  {
+   ENUM_ENTRY_SIGNAL rsiSignal = m_Mfi.TradeSignal(MFI_Directional);
+   ENUM_ENTRY_SIGNAL macdSignal = m_Macd.TradeFilter(MACD_Directional);
+
+   return macdSignal == rsiSignal && rsiSignal != ENTRY_SIGNAL_NONE ? rsiSignal : ENTRY_SIGNAL_NONE;
+  }
+
 // the expert to run our strategy
-CSingleExpert singleExpert(ExpertMagic, "...");
+CSingleExpert singleExpert(ExpertMagic, "MACD & RSI");
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -234,7 +289,7 @@ int OnInit()
 //--- set up Trading Strategy Implementaion
    CStrategyImpl *strategy = new CStrategyImpl(_Symbol, InpTimeframe, InpLotSizeMultiple);
    CPositionManager *positionManager = CreatPositionManager(_Symbol, InpTimeframe,
-                                       InpPostManagmentType, InpLongKcPeriod,
+                                       InpPostManagmentType, InpATRPeriod,
                                        InpStopLossPoints, InpBreakEvenPoints, InpTrailingOrTpPoints,
                                        InpMaxLossAmount, InpScratchBreakEvenFlag, false, 5,
                                        InpStopLossMultiple, InpTrailingOrTpMultiple, InpTrailingOrTpMultiple);

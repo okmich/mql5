@@ -8,8 +8,15 @@ import pytz
 from datetime import datetime
 
 broker = "Deriv"
-interested_symbols= ['Volatility 25 (1s) Index', 'Volatility 75 (1s) Index', 'Volatility 250 (1s) Index', 
-      'Step Index', 'Volatility 75 Index', 'EURJPY', 'BTCUSD', 'XAUUSD', 'EURUSD']
+interested_symbols= ['Volatility 10 (1s) Index', 'Volatility 10 Index', 
+                     'Volatility 25 (1s) Index', 'Volatility 25 Index', 
+                     'Volatility 50 (1s) Index', 'Volatility 50 Index',  
+                     'Volatility 75 (1s) Index', 'Volatility 75 Index', 
+                     'Volatility 100 (1s) Index', 'Volatility 100 Index',
+                     'Step Index',
+                     'EURJPY', 'EURUSD', 'GBPUSD', 'USDCAD', 'USDJPY',
+                     'BTCUSD', 'ETHUSD', 'SOLUSD', 'XRPUSD', 'BNBUSD', 
+                     'XAUUSD', 'XAGUSD', ]
 valid_path_prefix = ['Crypto', 'Energies', 'ETFs', 'Forex Major', 'Forex Minor', 'Metals', 'Stock Indices', 
       'Volatility Indices', 'Step Indices']
 
@@ -17,8 +24,8 @@ is_synthetic = True
 timeframe = mt5.TIMEFRAME_M1 if is_synthetic else mt5.TIMEFRAME_M5
 timezone = pytz.timezone("Etc/GMT+2")
 date_from = datetime(2013, 10, 1, tzinfo=timezone)
-date_to = datetime(2024, 12, 31, hour = 23, minute=59, tzinfo=timezone)
-file_location = "C:\\Users\\okmic\\AppData\\Roaming\\MetaQuotes\\Terminal\\FB9A56D617EDDDFE29EE54EBEFFE96C1\\MQL5\\Files"
+date_to = datetime(2025, 1, 31, hour = 23, minute=59, tzinfo=timezone)
+file_location = r"C:\Users\okmic\AppData\Roaming\MetaQuotes\Terminal\BCEF3407BBF131B442A8FC1AD8407C61\MQL5\Files"
 dt_range_str = f"{date_to.strftime('%Y%m%d')}-{date_from.strftime('%Y%m%d')}"
 
 def download(sym, tf):
@@ -30,7 +37,7 @@ def download(sym, tf):
     rates_df['time']=pd.to_datetime(rates_df['time'], unit='s')
 
     # rates_df.to_hdf(f"{file_location}\\market_data-5M-{dt_range_str}.hd5", key=sym.name, mode='a', complib='bzip2')
-    rates_df.to_parquet(f"{file_location}\\{sym.name}_{broker}_data-5M-{dt_range_str}.parquet")
+    rates_df.to_parquet(f"{file_location}\\{sym.name}_{broker}_data-5M-{dt_range_str}.parquet", compression='gzip')
     print(f"Copied rate data for '{sym.name}' from {date_from} to {date_to}")
 
 # establish MetaTrader 5 connection to a specified trading account
@@ -53,6 +60,8 @@ for sym in symbols:
       download(sym, timeframe)
       print(f"name: {sym.name}, path={sym.path}")
       count = count + 1
+   else:
+      print(f"Skipping {sym.name}, path={sym.path}")
    
 print(f"Done copying {count} instruments. See all files in {file_location}")
 

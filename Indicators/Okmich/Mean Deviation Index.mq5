@@ -41,6 +41,7 @@ input int      mMDISmoothing=5;    //Smoothing
 input int      mDblSmoothing=5;     //Dbl Smoothing
 input int      MDISignal=5;         //Signal
 input double   mTrendMarket=0.0001;  //Trend Mark Height
+input ENUM_MA_METHOD   mMaType=MODE_EMA;  //Smoothing Method
 
 //--- indicator buffers
 double         MDIBuffer[];
@@ -95,15 +96,15 @@ int OnCalculate(const int rates_total,
 
    int start = (prev_calculated==0) ? prev_calculated: prev_calculated-1;
 //get ema of price
-   ExponentialMAOnBuffer(rates_total, prev_calculated, beginPeriod, mMDIPeriod, price, movingAvgBuffer);
+   CalculateMaOnBuffer(rates_total, prev_calculated, beginPeriod, mMDIPeriod, price, movingAvgBuffer);
 
    for(int i=start; i<rates_total && !IsStopped(); i++)
      {
       detrendBuffer[i] = (price[i] - movingAvgBuffer[i])/price[i];
      }
-//get ema of detrendBuffer
-   ExponentialMAOnBuffer(rates_total, prev_calculated, beginSmooth, mMDISmoothing, detrendBuffer, dblDeTrendBuffer);
-   ExponentialMAOnBuffer(rates_total, prev_calculated, beginDblSmooth, mDblSmoothing, dblDeTrendBuffer, MDIBuffer);
+//get ma of detrendBuffer
+   CalculateMaOnBuffer(rates_total, prev_calculated, beginSmooth, mMDISmoothing, detrendBuffer, dblDeTrendBuffer);
+   CalculateMaOnBuffer(rates_total, prev_calculated, beginDblSmooth, mDblSmoothing, dblDeTrendBuffer, MDIBuffer);
    ExponentialMAOnBuffer(rates_total, prev_calculated, beginSignal, MDISignal, MDIBuffer, MDISignalBuffer);
 
    for(int i=start; i<rates_total && !IsStopped(); i++)
@@ -122,4 +123,29 @@ int OnCalculate(const int rates_total,
 //--- return value of prev_calculated for next call
    return(rates_total);
   }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void CalculateMaOnBuffer(int rates_total, int prev_calculated, int start, int period, const double &price[], double &buffer[])
+  {
+   switch(mMaType)
+     {
+
+      case MODE_LWMA:
+         LinearWeightedMAOnBuffer(rates_total, prev_calculated, start, period, price, buffer);
+         break;
+      case MODE_SMA:
+         SimpleMAOnBuffer(rates_total, prev_calculated, start, period, price, buffer);
+         break;
+      case MODE_SMMA:
+         SmoothedMAOnBuffer(rates_total, prev_calculated, start, period, price, buffer);
+         break;
+      case MODE_EMA:
+      default:
+         ExponentialMAOnBuffer(rates_total, prev_calculated, start, period, price, buffer);
+
+     }
+  }
+
 //+------------------------------------------------------------------+

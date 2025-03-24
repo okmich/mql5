@@ -81,10 +81,7 @@ bool CKeltnerChannel::Init(void)
    ArraySetAsSeries(m_TopBuffer, true);
    ArraySetAsSeries(m_MaBuffer, true);
    ArraySetAsSeries(m_BottomBuffer, true);
-   //m_Handle = iCustom(m_Symbol, m_TF, "Articles\\Keltner Channel",
-   //                   mMaPeriod, mAtrMultiplier, true, mMaType, mAppliedPrice);
-   m_Handle = iCustom(m_Symbol, m_TF, "Okmich\\Keltner Channel",
-                      mMaPeriod, mAtrMultiplier, mMaType, mAppliedPrice);
+   m_Handle = iCustom(m_Symbol, m_TF, "Okmich\\Keltner Channel", mMaPeriod, mAtrMultiplier, mMaType, mAppliedPrice);
 
    return m_Handle != INVALID_HANDLE;
   }
@@ -238,6 +235,8 @@ ENUM_ENTRY_SIGNAL CKeltnerChannel::PullBackSignal(int shift=1)
 ENUM_ENTRY_SIGNAL CKeltnerChannel::AboveBelowBandFilter(int shift=1)
   {
    double closeShift = iClose(m_Symbol, m_TF, shift);
+   double topShift = m_TopBuffer[shift];
+   double bottomShift = m_BottomBuffer[shift];
 //go long if price is above the upper band,
    if(closeShift > m_TopBuffer[shift])
       return ENTRY_SIGNAL_BUY;
@@ -290,6 +289,7 @@ ENUM_ENTRY_SIGNAL CKeltnerChannel::TradeFilter(ENUM_KTC_FILTER filterType)
    switch(filterType)
      {
       case KTC_FILTER_ABOVE_BELOW_BAND:
+         return AboveBelowBandFilter(m_ShiftToUse);
       case KTC_FILTER_ABOVE_BELOW_BAND_2:
          return AboveBelowBandFilter(m_ShiftToUse);
       case KTC_FILTER_ABOVE_BELOW_MA:

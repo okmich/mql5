@@ -52,8 +52,6 @@ public:
 
    virtual double    GetStopLoss(Entry &entry);
    virtual double    GetTakeProfit(Entry &entry);
-
-   virtual double    atr(int shift1) { return mStopLossPoints;};
   };
 
 
@@ -67,15 +65,16 @@ void CFixedPositionManager::manageLongPosition(CTrade &mTradeHandle, CPositionIn
    double stopLoss = positionInfo.StopLoss();
    double takeProfit = positionInfo.TakeProfit();
    double openPrice = positionInfo.PriceOpen();
+   double bidPrice = mSymbolInfo.Ask(); // long trades close at the bid
 //--- if stop or tp is not set, then set both
    if(stopLoss == 0 || stopLoss == EMPTY_VALUE || takeProfit == 0 || takeProfit == EMPTY_VALUE)
      {
       //we are going to add spread to the tp
+      double spread = iSpread(mSymbolInfo.Name(), mTimeframe, 0);
       double stopLossDist = mUseHiddenStopLoss ?  mStopLossPoints * mHiddenStopLossMultiple : mStopLossPoints;
       double takeProfitDist = mUseHiddenStopLoss ?  mMaxFloatingPoints * mHiddenStopLossMultiple : mMaxFloatingPoints;
-      stopLoss = openPrice - (stopLossDist * mSymbolInfo.Point());
-      double spread = iSpread(mSymbolInfo.Name(), mTimeframe, 0);
-      takeProfit = openPrice + (takeProfitDist * mSymbolInfo.Point()) + spread;
+      stopLoss = openPrice - ((stopLossDist + spread) * mSymbolInfo.Point());
+      takeProfit = openPrice + (takeProfitDist * mSymbolInfo.Point());
       if(ModifyPosition(mTradeHandle, positionInfo.Ticket(), stopLoss, takeProfit))
          return;
      }
@@ -94,14 +93,15 @@ void CFixedPositionManager::manageShortPosition(CTrade &mTradeHandle, CPositionI
    double stopLoss = positionInfo.StopLoss();
    double takeProfit = positionInfo.TakeProfit();
    double openPrice = positionInfo.PriceOpen();
+   double askPrice = mSymbolInfo.Ask(); // short trades close at the ask
 //--- if stop is not set, then set it
    if(stopLoss == 0 || stopLoss == EMPTY_VALUE || takeProfit == 0 || takeProfit == EMPTY_VALUE)
      {
       double spread = iSpread(mSymbolInfo.Name(), mTimeframe, 0);
       double stopLossDist = mUseHiddenStopLoss ?  mStopLossPoints * mHiddenStopLossMultiple : mStopLossPoints;
       double takeProfitDist = mUseHiddenStopLoss ?  mMaxFloatingPoints * mHiddenStopLossMultiple : mMaxFloatingPoints;
-      stopLoss = openPrice + (stopLossDist * mSymbolInfo.Point());
-      takeProfit = openPrice - (takeProfitDist * mSymbolInfo.Point()) - spread;
+      stopLoss = openPrice + ((stopLossDist + spread) * mSymbolInfo.Point());
+      takeProfit = openPrice - (takeProfitDist * mSymbolInfo.Point());
       if(ModifyPosition(mTradeHandle, positionInfo.Ticket(), stopLoss, takeProfit))
          return;
      }

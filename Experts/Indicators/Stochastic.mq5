@@ -23,7 +23,8 @@ input int      InpSlowing=3;
 input double      InpOBLevel=80;
 input ENUM_STO_PRICE InpFieldType = STO_LOWHIGH;
 input ENUM_MA_METHOD InpSmoothing = MODE_SMA;
-input double InpDefaultVolume=0.1; //Lot size
+
+input int InpLotSizeMultiple=1; //Lot size multiple
 
 input ulong    ExpertMagic           = 980023;              //Expert MagicNumbers
 
@@ -63,7 +64,7 @@ public:
       mFieldType = InptFieldType;
       mSmoothing = InptSmoothing;
 
-      mLotSize = 2*SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+      mLotSize = InpLotSizeMultiple*SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
      };
 
    virtual bool      Init(ulong magic);

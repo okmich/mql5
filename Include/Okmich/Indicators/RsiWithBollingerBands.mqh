@@ -13,6 +13,7 @@ enum ENUM_RsiBB_Strategies
   {
    RsiBB_RsiBBMid_Crossover,
    RsiBB_RsiBBObOsEntry,
+   RsiBB_RsiBBObOsExit,
    RsiBB_RsiSignal_Crossover
   };
 
@@ -33,6 +34,7 @@ private :
 
    ENUM_ENTRY_SIGNAL  RsiBBMidCrossover();
    ENUM_ENTRY_SIGNAL  RsiBBObOsEntry();
+   ENUM_ENTRY_SIGNAL  RsiBBObOsExit();
    ENUM_ENTRY_SIGNAL  RsiSignalCrossover();
 
 public:
@@ -178,15 +180,34 @@ ENUM_ENTRY_SIGNAL CRsiBBands::RsiBBMidCrossover(void)
       else
          return ENTRY_SIGNAL_NONE;
   }
+
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 ENUM_ENTRY_SIGNAL CRsiBBands::RsiBBObOsEntry(void)
   {
-   if(m_RsiBuffer[m_ShiftToUse] < m_BBBlBuffer[m_ShiftToUse])
+   if(m_RsiBuffer[m_ShiftToUse+1] > m_BBBlBuffer[m_ShiftToUse+1] &&
+      m_RsiBuffer[m_ShiftToUse] < m_BBBlBuffer[m_ShiftToUse])  //crossing the lower bband downward
       return ENTRY_SIGNAL_BUY;
    else
-      if(m_RsiBuffer[m_ShiftToUse] > m_BBTlBuffer[m_ShiftToUse])
+      if(m_RsiBuffer[m_ShiftToUse+1] < m_BBTlBuffer[m_ShiftToUse+1] &&
+         m_RsiBuffer[m_ShiftToUse] > m_BBTlBuffer[m_ShiftToUse])   //crossing the upper bband upward
+         return ENTRY_SIGNAL_SELL;
+      else
+         return ENTRY_SIGNAL_NONE;
+  }
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+ENUM_ENTRY_SIGNAL CRsiBBands::RsiBBObOsExit(void)
+  {
+   if(m_RsiBuffer[m_ShiftToUse+1] < m_BBBlBuffer[m_ShiftToUse+1] &&
+      m_RsiBuffer[m_ShiftToUse] > m_BBBlBuffer[m_ShiftToUse]) //crossing the lower bband upward
+      return ENTRY_SIGNAL_BUY;
+   else
+      if(m_RsiBuffer[m_ShiftToUse+1] > m_BBTlBuffer[m_ShiftToUse+1]&&
+         m_RsiBuffer[m_ShiftToUse] < m_BBTlBuffer[m_ShiftToUse])  //crossing the upper bband downward
          return ENTRY_SIGNAL_SELL;
       else
          return ENTRY_SIGNAL_NONE;
@@ -220,6 +241,8 @@ ENUM_ENTRY_SIGNAL CRsiBBands::TradeSignal(ENUM_RsiBB_Strategies signalOption)
          return RsiBBMidCrossover();
       case RsiBB_RsiBBObOsEntry:
          return RsiBBObOsEntry();
+      case RsiBB_RsiBBObOsExit:
+         return RsiBBObOsExit();
       case RsiBB_RsiSignal_Crossover:
          return RsiSignalCrossover();
       default:

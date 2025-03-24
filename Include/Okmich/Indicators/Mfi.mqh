@@ -68,6 +68,11 @@ public:
 
    double             GetData(int shift=0);
    void               GetData(double &buffer[], int shift=0);
+   
+   void               SetLevels(double InptOBLevel, double InptOSLevel){
+      m_ObLevel = InptOBLevel;
+      m_OsLevel = InptOSLevel;
+   };
 
    ENUM_ENTRY_SIGNAL  TradeSignal(ENUM_MFI_Strategies signalOption);
   };

@@ -107,7 +107,7 @@ void CStrategyImpl::CheckAndSetExitSignal(CPositionInfo &positionInfo, Position 
      {
       signal = m_KetChanl.TradeFilter(InpHowToStrategy);
      }
-     
+
    if(posType == POSITION_TYPE_BUY && signal != ENTRY_SIGNAL_BUY)
      {
       position.signal = EXIT_SIGNAL_EXIT;
@@ -136,6 +136,7 @@ void CStrategyImpl::Refresh(void)
       mEntrySignal = SupportLongEntries(InpLongShortFlag) && signal == ENTRY_SIGNAL_BUY ? signal :
                      SupportShortEntries(InpLongShortFlag) && signal == ENTRY_SIGNAL_SELL ? signal :
                      ENTRY_SIGNAL_NONE;
+      m_KetChanl.TradeFilter(InpHowToStrategy);
      }
   }
 
